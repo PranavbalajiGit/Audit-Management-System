@@ -22,7 +22,7 @@ const verificationAnswerSchema = new mongoose.Schema({
   },
   answer: {
     type: String,
-    required: true,
+    required: false,
   },
   validationResult: {
     type: String,
