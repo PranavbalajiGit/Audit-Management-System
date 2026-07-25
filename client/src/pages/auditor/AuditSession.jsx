@@ -418,7 +418,7 @@ const AuditSession = () => {
               <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              GPS Verified! You are {audit.gpsData.distanceMeters} meters away (Tolerance: {process.env.GPS_TOLERANCE_METERS || 50}m).
+              GPS Verified! You are {audit.gpsData.distanceMeters} meters away (Tolerance: {import.meta.env.VITE_GPS_TOLERANCE_METERS || 50}m).
             </div>
           )}
 
@@ -484,7 +484,7 @@ const AuditSession = () => {
                   {/* Circle indicating tolerance boundary */}
                   <Circle 
                     center={[room.latitude, room.longitude]} 
-                    radius={parseInt(process.env.GPS_TOLERANCE_METERS, 10) || 50} 
+                    radius={parseInt(import.meta.env.VITE_GPS_TOLERANCE_METERS, 10) || 50} 
                     pathOptions={{ color: 'emerald', fillColor: 'emerald', fillOpacity: 0.1 }}
                   />
 
