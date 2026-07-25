@@ -1,0 +1,399 @@
+const auditRepository = require('../repository/audit.repository');
+const roomRepository = require('../../rooms/repository/room.repository');
+const User = require('../../users/model/user.model');
+const Checklist = require('../../checklists/model/checklist.model');
+const aiService = require('../../../shared/ai/ai.service');
+const AppError = require('../../../shared/errors/appError');
+
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // metres
+  const phi1 = lat1 * Math.PI/180;
+  const phi2 = lat2 * Math.PI/180;
+  const deltaPhi = (lat2-lat1) * Math.PI/180;
+  const deltaLambda = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c; // in metres
+}
+
+class AuditService {
+  // --- Assignment Logic ---
+
+  async createAssignment(assignmentData) {
+    // Validate target room
+    const room = await roomRepository.findById(assignmentData.roomId);
+    if (!room) {
+      throw new AppError('Target room not found', 404);
+    }
+
+    // Validate auditor
+    const auditor = await User.findById(assignmentData.auditorId).populate('roleId');
+    if (!auditor || auditor.roleId.name !== 'Auditor') {
+      throw new AppError('Target user is not a valid auditor', 400);
+    }
+
+    // Validate checklist
+    const checklist = await Checklist.findById(assignmentData.checklistId);
+    if (!checklist) {
+      throw new AppError('Checklist template not found', 404);
+    }
+
+    // Check if room category aligns with checklist category
+    if (room.roomType !== checklist.categoryId.name) {
+      // Allow it but log/warn, or enforce it
+      console.warn(`[Assignment Warning] Room type (${room.roomType}) differs from Checklist category (${checklist.categoryId.name})`);
+    }
+
+    return await auditRepository.createAssignment(assignmentData);
+  }
+
+  async getAssignments(filters, page, limit) {
+    const dbFilter = {};
+    if (filters.auditorId) {
+      dbFilter.auditorId = filters.auditorId;
+    }
+    if (filters.status) {
+      dbFilter.status = filters.status;
+    }
+    return await auditRepository.findAssignments(dbFilter, page, limit);
+  }
+
+  async getAssignmentById(id) {
+    const assignment = await auditRepository.findAssignmentById(id);
+    if (!assignment) {
+      throw new AppError('Assignment not found', 404);
+    }
+    return assignment;
+  }
+
+  // --- Audit Execution Workflow ---
+
+  async startAudit(assignmentId, auditorId) {
+    const assignment = await auditRepository.findAssignmentById(assignmentId);
+    if (!assignment) {
+      throw new AppError('Assignment not found', 404);
+    }
+
+    if (assignment.auditorId._id.toString() !== auditorId.toString()) {
+      throw new AppError('You are not authorized to start this audit', 403);
+    }
+
+    // Check if an In Progress audit already exists
+    let audit = await auditRepository.findActiveAuditByAssignment(assignmentId);
+    if (!audit) {
+      // Create new Audit document
+      audit = await auditRepository.createAudit({
+        assignmentId,
+        auditorId,
+        roomId: assignment.roomId._id,
+        status: 'In Progress',
+        confidenceScore: 0,
+        qrVerified: false,
+        images: [],
+        checklistAnswers: [],
+        verificationAnswers: []
+      });
+
+      // Update assignment
+      assignment.status = 'In Progress';
+      assignment.auditId = audit._id;
+      await assignment.save();
+    }
+
+    return audit;
+  }
+
+  async getAuditById(id) {
+    const audit = await auditRepository.findAuditById(id);
+    if (!audit) {
+      throw new AppError('Audit not found', 404);
+    }
+    return audit;
+  }
+
+  async getAudits(filters, page, limit) {
+    const dbFilter = {};
+    if (filters.auditorId) {
+      dbFilter.auditorId = filters.auditorId;
+    }
+    if (filters.status) {
+      dbFilter.status = filters.status;
+    }
+    if (filters.roomId) {
+      dbFilter.roomId = filters.roomId;
+    }
+    return await auditRepository.findAudits(dbFilter, page, limit);
+  }
+
+  async verifyQR(auditId, qrToken, auditorId) {
+    const audit = await auditRepository.findAuditById(auditId);
+    if (!audit) {
+      throw new AppError('Audit session not found', 404);
+    }
+
+    if (audit.auditorId._id.toString() !== auditorId.toString()) {
+      throw new AppError('Unauthorized', 403);
+    }
+
+    // Look up QR Code record
+    const qrRecord = await roomRepository.findQRCodeByData(qrToken);
+    if (!qrRecord || qrRecord.roomId._id.toString() !== audit.roomId._id.toString()) {
+      throw new AppError('Invalid QR Code. Does not match target room.', 400);
+    }
+
+    audit.qrVerified = true;
+    await audit.save();
+    return { success: true, qrVerified: true };
+  }
+
+  async verifyGPS(auditId, latitude, longitude, accuracy, auditorId) {
+    const audit = await auditRepository.findAuditById(auditId);
+    if (!audit) {
+      throw new AppError('Audit session not found', 404);
+    }
+
+    if (audit.auditorId._id.toString() !== auditorId.toString()) {
+      throw new AppError('Unauthorized', 403);
+    }
+
+    const room = audit.roomId;
+    if (!room.latitude || !room.longitude) {
+      throw new AppError('Target room GPS coordinates not registered by administrator', 400);
+    }
+
+    // Calculate distance
+    const distance = haversineDistance(latitude, longitude, room.latitude, room.longitude);
+    const tolerance = parseInt(process.env.GPS_TOLERANCE_METERS, 10) || 50;
+    const verified = distance <= tolerance;
+
+    audit.gpsData = {
+      latitude,
+      longitude,
+      accuracy,
+      distanceMeters: Math.round(distance),
+      verified,
+      capturedAt: new Date()
+    };
+
+    await audit.save();
+
+    return {
+      distanceMeters: Math.round(distance),
+      tolerance,
+      verified
+    };
+  }
+
+  async uploadImage(auditId, fileUrl, localPath, imageType, auditorId) {
+    const audit = await auditRepository.findAuditById(auditId);
+    if (!audit) {
+      throw new AppError('Audit session not found', 404);
+    }
+
+    if (audit.auditorId._id.toString() !== auditorId.toString()) {
+      throw new AppError('Unauthorized', 403);
+    }
+
+    audit.images.push({
+      cloudinaryUrl: fileUrl,
+      localPath,
+      imageType: imageType || 'Other',
+      capturedAt: new Date()
+    });
+
+    await audit.save();
+    return audit.images;
+  }
+
+  async deleteImage(auditId, imageUrl, auditorId) {
+    const audit = await auditRepository.findAuditById(auditId);
+    if (!audit) {
+      throw new AppError('Audit session not found', 404);
+    }
+
+    if (audit.auditorId._id.toString() !== auditorId.toString()) {
+      throw new AppError('Unauthorized', 403);
+    }
+
+    audit.images = audit.images.filter(img => img.cloudinaryUrl !== imageUrl);
+    await audit.save();
+    return audit.images;
+  }
+
+  async runAIAnalysis(auditId, auditorId) {
+    const audit = await auditRepository.findAuditById(auditId);
+    if (!audit) {
+      throw new AppError('Audit session not found', 404);
+    }
+
+    if (audit.auditorId._id.toString() !== auditorId.toString()) {
+      throw new AppError('Unauthorized', 403);
+    }
+
+    if (audit.images.length === 0) {
+      throw new AppError('Please upload at least one room image before running AI analysis', 400);
+    }
+
+    // Pick first image (wide or asset) for classification/VLM analysis
+    const targetImage = audit.images.find(img => img.imageType === 'Wide' || img.imageType === 'Entrance') || audit.images[0];
+    
+    // Fetch image from local path if mock
+    let base64Image = null;
+    if (aiService.isMock && targetImage.localPath) {
+      try {
+        const fs = require('fs');
+        const buffer = fs.readFileSync(targetImage.localPath);
+        base64Image = buffer.toString('base64');
+      } catch (err) {
+        console.error('[AI Analysis] Failed to read local image file for mock', err.message);
+      }
+    }
+
+    const roomType = audit.roomId.roomType;
+    console.log(`[AI Analysis] Running VLM analysis on ${targetImage.cloudinaryUrl} for ${roomType}`);
+    
+    // Call VLM Analysis
+    const analysis = await aiService.analyzeImage(targetImage.cloudinaryUrl, roomType, base64Image);
+
+    audit.aiAnalysis = {
+      roomClassification: analysis.roomClassification,
+      sceneDescription: analysis.sceneDescription,
+      objects: analysis.objects,
+      confidence: analysis.confidence,
+      analyzedAt: new Date()
+    };
+
+    await audit.save();
+
+    // Trigger Dynamic Question Generation based on checklist title and AI findings
+    const checklistTitle = audit.assignmentId.checklistId.title;
+    const questions = await aiService.generateQuestions(analysis, checklistTitle);
+
+    audit.verificationAnswers = questions.map(q => ({
+      question: q.question,
+      answer: '',
+      validationResult: 'Requires review'
+    }));
+
+    await audit.save();
+
+    return {
+      aiAnalysis: audit.aiAnalysis,
+      verificationQuestions: questions
+    };
+  }
+
+  async submitAudit(auditId, checklistAnswers, verificationAnswers, auditorId) {
+    const audit = await auditRepository.findAuditById(auditId);
+    if (!audit) {
+      throw new AppError('Audit session not found', 404);
+    }
+
+    if (audit.auditorId._id.toString() !== auditorId.toString()) {
+      throw new AppError('Unauthorized', 403);
+    }
+
+    if (audit.status !== 'In Progress') {
+      throw new AppError('Audit has already been submitted or completed', 400);
+    }
+
+    // Validate checklist structure matches the assignment checklist
+    const assignment = audit.assignmentId;
+    const checklist = assignment.checklistId;
+
+    if (!Array.isArray(checklistAnswers) || checklistAnswers.length === 0) {
+      throw new AppError('Checklist answers are required', 400);
+    }
+
+    // Check mandatory items
+    for (const item of checklist.items) {
+      if (item.mandatory) {
+        const answered = checklistAnswers.find(ans => ans.questionId === item._id.toString());
+        if (!answered || answered.answer === undefined || answered.answer === null) {
+          throw new AppError(`Mandatory checklist question "${item.question}" is not answered`, 400);
+        }
+      }
+    }
+
+    // Update checklist answers on audit
+    audit.checklistAnswers = checklistAnswers;
+
+    // Validate dynamic question answers
+    if (!audit.aiAnalysis || !audit.aiAnalysis.roomClassification) {
+      throw new AppError('AI image analysis must be executed before final submission', 400);
+    }
+
+    if (!Array.isArray(verificationAnswers) || verificationAnswers.length !== audit.verificationAnswers.length) {
+      throw new AppError('All AI-generated verification questions must be answered', 400);
+    }
+
+    // Validate answers using AI
+    console.log('[Audit Submission] AI validating dynamic answers...');
+    const validated = await aiService.validateAnswers(verificationAnswers, audit.aiAnalysis);
+    audit.verificationAnswers = validated;
+
+    // Calculate final confidence score
+    const signals = {
+      qrVerified: audit.qrVerified,
+      gpsVerified: audit.gpsData?.verified || false,
+      gpsDistance: audit.gpsData?.distanceMeters || 9999,
+      vlmRoomType: audit.aiAnalysis.roomClassification,
+      vlmConfidence: audit.aiAnalysis.confidence,
+      expectedRoomType: audit.roomId.roomType,
+      validationAnswers: validated
+    };
+
+    const confidenceScore = aiService.calculateConfidence(signals);
+    audit.confidenceScore = confidenceScore;
+    audit.submittedAt = new Date();
+
+    // Determine final status based on thresholds
+    // >= 90: Approved, 70-89: Review Required, < 70: Rejected
+    let finalStatus = 'Review Required';
+    if (confidenceScore >= 90) {
+      finalStatus = 'Approved';
+    } else if (confidenceScore < 70) {
+      finalStatus = 'Rejected';
+    }
+
+    audit.status = finalStatus;
+    await audit.save();
+
+    // Update assignment status
+    assignment.status = finalStatus;
+    await assignment.save();
+
+    return audit;
+  }
+
+  async updateAuditStatus(auditId, status, notes, adminId) {
+    const audit = await auditRepository.findAuditById(auditId);
+    if (!audit) {
+      throw new AppError('Audit not found', 404);
+    }
+
+    if (!['Approved', 'Rejected', 'Review Required'].includes(status)) {
+      throw new AppError('Invalid status value', 400);
+    }
+
+    audit.status = status;
+    audit.notes = notes || audit.notes;
+    audit.approvedBy = adminId;
+    await audit.save();
+
+    // Update assignment
+    const assignment = await auditRepository.findAssignmentById(audit.assignmentId);
+    if (assignment) {
+      assignment.status = status;
+      await assignment.save();
+    }
+
+    return audit;
+  }
+}
+
+module.exports = new AuditService();
