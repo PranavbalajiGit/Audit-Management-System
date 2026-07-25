@@ -34,6 +34,26 @@ const Login = () => {
     }
   };
 
+  const handleQuickLogin = async (quickEmail, quickPassword) => {
+    setEmail(quickEmail);
+    setPassword(quickPassword);
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const user = await login(quickEmail, quickPassword);
+      if (user.role === 'Admin') {
+        navigate('/admin');
+      } else {
+        navigate('/auditor');
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid email or password');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 py-12">
       {/* Dynamic Background Gradients */}
@@ -56,8 +76,35 @@ const Login = () => {
           </p>
         </div>
 
+        {/* Quick Login Selection Cards */}
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button
+            onClick={() => handleQuickLogin('admin@s7.com', 'Password123!')}
+            disabled={submitting}
+            className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/30 hover:bg-indigo-600/10 hover:border-indigo-500/50 transition duration-300 active:scale-[0.98] disabled:opacity-50"
+          >
+            <span className="text-xs font-bold text-white font-outfit">Quick Admin</span>
+            <span className="text-[9px] text-slate-500 font-mono mt-0.5">admin@s7.com</span>
+          </button>
+
+          <button
+            onClick={() => handleQuickLogin('auditor@s7.com', 'Password123!')}
+            disabled={submitting}
+            className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/30 hover:bg-emerald-600/10 hover:border-emerald-500/50 transition duration-300 active:scale-[0.98] disabled:opacity-50"
+          >
+            <span className="text-xs font-bold text-white font-outfit">Quick Auditor</span>
+            <span className="text-[9px] text-slate-500 font-mono mt-0.5">auditor@s7.com</span>
+          </button>
+        </div>
+
+        <div className="flex items-center my-4">
+          <div className="flex-1 border-t border-slate-800/30"></div>
+          <span className="mx-3 text-[9px] text-slate-500 font-bold uppercase tracking-wider">Or Credentials</span>
+          <div className="flex-1 border-t border-slate-800/30"></div>
+        </div>
+
         {error && (
-          <div className="mt-6 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
             <div className="flex items-center">
               <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -67,7 +114,7 @@ const Login = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+        <form onSubmit={handleSubmit} className="mt-3 space-y-5">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
               Email Address
@@ -96,11 +143,6 @@ const Login = () => {
             />
           </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-400 select-none">
-              Default creds: <code className="text-indigo-300 font-mono text-xs">admin@s7.com</code> / <code className="text-indigo-300 font-mono text-xs">Password123!</code>
-            </span>
-          </div>
 
           <button
             type="submit"
