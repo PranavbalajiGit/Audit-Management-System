@@ -303,19 +303,15 @@ class AuditService {
       throw new AppError('Please upload at least one room image before running AI analysis', 400);
     }
 
-    // Pick first image (wide or asset) for classification/VLM analysis
-    const targetImage = audit.images.find(img => img.imageType === 'Wide' || img.imageType === 'Entrance') || audit.images[0];
-
-    // Read the image bytes from disk when available (local/mock storage)
-    let base64Image = this.readImageAsBase64(targetImage);
+    // Pass ALL uploaded images for comprehensive VLM analysis
+    const base64Images = audit.images.map(img => this.readImageAsBase64(img)).filter(b64 => b64);
+    const imageUrls = audit.images.map(img => img.cloudinaryUrl);
 
     const roomType = audit.roomId.roomType;
-    const sizeKb = base64Image ? Math.round(base64Image.length / 1024) : 0;
-    console.log(`[AI Analysis] audit=${auditId} provider=${aiService.provider} roomType=${roomType}`);
-    console.log(`[AI Analysis] image type=${targetImage.imageType} localPath=${targetImage.localPath || 'none'} url=${targetImage.cloudinaryUrl} bytes=${sizeKb}KB`);
+    console.log(`[AI Analysis] audit=${auditId} provider=${aiService.provider} roomType=${roomType} imageCount=${audit.images.length}`);
     
     // Call VLM Analysis
-    const analysis = await aiService.analyzeImage(targetImage.cloudinaryUrl, roomType, base64Image);
+    const analysis = await aiService.analyzeImage(imageUrls, roomType, base64Images.length > 0 ? base64Images : null);
 
     audit.aiAnalysis = {
       roomClassification: analysis.roomClassification,
