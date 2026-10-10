@@ -10,8 +10,13 @@ const apiRouter = require('./routes');
 
 const app = express();
 
-// Set security HTTP headers
-app.use(helmet());
+// Set security HTTP headers.
+// crossOriginResourcePolicy must be 'cross-origin' so the client dev origin
+// (http://localhost:5173) can actually render uploaded images served from the
+// API origin (http://localhost:5001/uploads/...).
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 
 // Enable CORS
 const corsOptions = {
