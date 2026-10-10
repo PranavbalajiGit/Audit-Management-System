@@ -177,8 +177,11 @@ const AuditSession = () => {
     setUploading(true);
     setUploadError('');
 
+    const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+    const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
     try {
-      const updatedImages = await auditService.uploadImage(id, file, imageType);
+      const updatedImages = await auditService.uploadImage(id, file, imageType, lat, lng);
       // A new photo invalidates any previous VLM analysis
       setAudit(prev => ({ ...prev, images: updatedImages, aiAnalysis: null, verificationAnswers: [] }));
       setAiAnswers({});
@@ -191,8 +194,12 @@ const AuditSession = () => {
 
   const handleImageDelete = async (url) => {
     if (!confirm('Are you sure you want to delete this image?')) return;
+    
+    const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+    const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
     try {
-      const updatedImages = await auditService.deleteImage(id, url);
+      const updatedImages = await auditService.deleteImage(id, url, lat, lng);
       setAudit(prev => ({ ...prev, images: updatedImages, aiAnalysis: null, verificationAnswers: [] }));
       setAiAnswers({});
     } catch (err) {
@@ -227,8 +234,12 @@ const AuditSession = () => {
   const handleRunAI = async () => {
     setAiRunning(true);
     setAiError('');
+    
+    const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+    const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
     try {
-      const res = await auditService.runAIAnalysis(id);
+      const res = await auditService.runAIAnalysis(id, lat, lng);
       setAudit(prev => ({
         ...prev,
         aiAnalysis: res.aiAnalysis,
@@ -282,8 +293,11 @@ const AuditSession = () => {
       return;
     }
 
+    const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+    const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
     try {
-      const finishedAudit = await auditService.submitAudit(id, formattedChecklist, formattedAI);
+      const finishedAudit = await auditService.submitAudit(id, formattedChecklist, formattedAI, lat, lng);
       setAudit(finishedAudit);
       setStep(6); // Success screen
     } catch (err) {
