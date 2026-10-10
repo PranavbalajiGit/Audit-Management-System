@@ -148,7 +148,7 @@ const verifyGPS = async (req, res, next) => {
 
 const uploadImage = async (req, res, next) => {
   try {
-    const { auditId, imageType } = req.body;
+    const { auditId, imageType, latitude, longitude } = req.body;
     if (!auditId) {
       return next(new AppError('Audit ID is required', 400));
     }
@@ -162,7 +162,9 @@ const uploadImage = async (req, res, next) => {
       req.fileUrl, 
       req.fileLocalPath, 
       imageType, 
-      req.user._id
+      req.user._id,
+      latitude,
+      longitude
     );
 
     res.status(200).json(successResponse('Image uploaded and linked successfully', images));
@@ -173,12 +175,12 @@ const uploadImage = async (req, res, next) => {
 
 const deleteImage = async (req, res, next) => {
   try {
-    const { auditId, imageUrl } = req.body;
+    const { auditId, imageUrl, latitude, longitude } = req.body;
     if (!auditId || !imageUrl) {
       return next(new AppError('Audit ID and Image URL are required', 400));
     }
 
-    const images = await auditService.deleteImage(auditId, imageUrl, req.user._id);
+    const images = await auditService.deleteImage(auditId, imageUrl, req.user._id, latitude, longitude);
     res.status(200).json(successResponse('Image removed successfully', images));
   } catch (error) {
     next(error);
@@ -187,12 +189,12 @@ const deleteImage = async (req, res, next) => {
 
 const runAIAnalysis = async (req, res, next) => {
   try {
-    const { auditId } = req.body;
+    const { auditId, latitude, longitude } = req.body;
     if (!auditId) {
       return next(new AppError('Audit ID is required', 400));
     }
 
-    const result = await auditService.runAIAnalysis(auditId, req.user._id);
+    const result = await auditService.runAIAnalysis(auditId, req.user._id, latitude, longitude);
     res.status(200).json(successResponse('AI analysis and question generation completed', result));
   } catch (error) {
     next(error);
