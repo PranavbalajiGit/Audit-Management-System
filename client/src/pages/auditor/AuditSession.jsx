@@ -48,6 +48,7 @@ const AuditSession = () => {
   const [aiRunning, setAiRunning] = useState(false);
   const [aiAnswers, setAiAnswers] = useState({}); // { [question]: answerText }
   const [aiError, setAiError] = useState('');
+  const [aiMeta, setAiMeta] = useState(null); // { provider, model } of the last VLM run
 
   // Final submit state
   const [submitting, setSubmitting] = useState(false);
@@ -178,7 +179,9 @@ const AuditSession = () => {
 
     try {
       const updatedImages = await auditService.uploadImage(id, file, imageType);
-      setAudit(prev => ({ ...prev, images: updatedImages }));
+      // A new photo invalidates any previous VLM analysis
+      setAudit(prev => ({ ...prev, images: updatedImages, aiAnalysis: null, verificationAnswers: [] }));
+      setAiAnswers({});
     } catch (err) {
       setUploadError(err.message || 'Failed to upload image.');
     } finally {
@@ -190,7 +193,8 @@ const AuditSession = () => {
     if (!confirm('Are you sure you want to delete this image?')) return;
     try {
       const updatedImages = await auditService.deleteImage(id, url);
-      setAudit(prev => ({ ...prev, images: updatedImages }));
+      setAudit(prev => ({ ...prev, images: updatedImages, aiAnalysis: null, verificationAnswers: [] }));
+      setAiAnswers({});
     } catch (err) {
       alert(err.message || 'Failed to delete image.');
     }
@@ -241,6 +245,7 @@ const AuditSession = () => {
         initAiAnswers[q.question] = '';
       });
       setAiAnswers(initAiAnswers);
+      setAiMeta({ provider: res.provider, model: res.model });
     } catch (err) {
       setAiError(err.message || 'AI service failed to analyze image.');
     } finally {
@@ -709,7 +714,7 @@ const AuditSession = () => {
 
           {!audit.aiAnalysis?.roomClassification ? (
             <div className="space-y-4 text-center py-6">
-              <p className="text-xs text-slate-400">Images are ready. Click below to execute Gemini VLM parsing.</p>
+              <p className="text-xs text-slate-400">Images are ready. Click below to execute VLM parsing.</p>
               <button
                 onClick={handleRunAI}
                 disabled={aiRunning}
@@ -718,14 +723,14 @@ const AuditSession = () => {
                 {aiRunning ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                    Gemini reading layout...
+                    VLM reading layout...
                   </>
                 ) : (
                   <>
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Analyze Space Layout with Gemini
+                    Analyze Space Layout with VLM
                   </>
                 )}
               </button>
@@ -747,6 +752,20 @@ const AuditSession = () => {
                       <span key={i} className="px-1.5 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-500/10 text-[9px] font-semibold">{obj}</span>
                     ))}
                   </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-indigo-500/15 pt-2">
+                  <span className="text-[10px] text-slate-500">
+                    {aiMeta ? `via ${aiMeta.provider}${aiMeta.model ? ` · ${aiMeta.model}` : ''} — ` : ''}
+                    {audit.aiAnalysis.analyzedAt ? `Analyzed ${new Date(audit.aiAnalysis.analyzedAt).toLocaleString()}` : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRunAI}
+                    disabled={aiRunning}
+                    className="text-[10px] font-semibold text-indigo-300 hover:text-indigo-200 disabled:opacity-50"
+                  >
+                    {aiRunning ? 'Re-analyzing...' : 'Re-run VLM Analysis'}
+                  </button>
                 </div>
               </div>
 

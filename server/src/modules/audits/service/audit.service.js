@@ -21,6 +21,23 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 class AuditService {
+  /**
+   * Read an audit image from its local path as base64 (no data URI).
+   * Returns null when no local file is available (e.g. remote Cloudinary URL).
+   */
+  readImageAsBase64(image) {
+    if (!image || !image.localPath) {
+      return null;
+    }
+    try {
+      const fs = require('fs');
+      return fs.readFileSync(image.localPath).toString('base64');
+    } catch (err) {
+      console.error('[Audit] Failed to read local image file', err.message);
+      return null;
+    }
+  }
+
   // --- Assignment Logic ---
 
   async createAssignment(assignmentData) {
@@ -240,21 +257,14 @@ class AuditService {
 
     // Pick first image (wide or asset) for classification/VLM analysis
     const targetImage = audit.images.find(img => img.imageType === 'Wide' || img.imageType === 'Entrance') || audit.images[0];
-    
-    // Fetch image from local path if mock
-    let base64Image = null;
-    if (aiService.isMock && targetImage.localPath) {
-      try {
-        const fs = require('fs');
-        const buffer = fs.readFileSync(targetImage.localPath);
-        base64Image = buffer.toString('base64');
-      } catch (err) {
-        console.error('[AI Analysis] Failed to read local image file for mock', err.message);
-      }
-    }
+
+    // Read the image bytes from disk when available (local/mock storage)
+    let base64Image = this.readImageAsBase64(targetImage);
 
     const roomType = audit.roomId.roomType;
-    console.log(`[AI Analysis] Running VLM analysis on ${targetImage.cloudinaryUrl} for ${roomType}`);
+    const sizeKb = base64Image ? Math.round(base64Image.length / 1024) : 0;
+    console.log(`[AI Analysis] audit=${auditId} provider=${aiService.provider} roomType=${roomType}`);
+    console.log(`[AI Analysis] image type=${targetImage.imageType} localPath=${targetImage.localPath || 'none'} url=${targetImage.cloudinaryUrl} bytes=${sizeKb}KB`);
     
     // Call VLM Analysis
     const analysis = await aiService.analyzeImage(targetImage.cloudinaryUrl, roomType, base64Image);
@@ -283,7 +293,9 @@ class AuditService {
 
     return {
       aiAnalysis: audit.aiAnalysis,
-      verificationQuestions: questions
+      verificationQuestions: questions,
+      provider: aiService.isMock ? 'mock' : aiService.provider,
+      model: aiService.provider === 'ollama' ? aiService.ollamaModel : null
     };
   }
 
@@ -331,9 +343,11 @@ class AuditService {
       throw new AppError('All AI-generated verification questions must be answered', 400);
     }
 
-    // Validate answers using AI
+    // Validate answers using AI (re-check against the room image when available)
     console.log('[Audit Submission] AI validating dynamic answers...');
-    const validated = await aiService.validateAnswers(verificationAnswers, audit.aiAnalysis);
+    const targetImage = audit.images.find(img => img.imageType === 'Wide' || img.imageType === 'Entrance') || audit.images[0];
+    const base64Image = this.readImageAsBase64(targetImage);
+    const validated = await aiService.validateAnswers(verificationAnswers, audit.aiAnalysis, base64Image);
     audit.verificationAnswers = validated;
 
     // Calculate final confidence score
