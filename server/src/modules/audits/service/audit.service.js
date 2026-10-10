@@ -299,7 +299,7 @@ class AuditService {
     };
   }
 
-  async submitAudit(auditId, checklistAnswers, verificationAnswers, auditorId) {
+  async submitAudit(auditId, checklistAnswers, verificationAnswers, auditorId, latitude, longitude) {
     const audit = await auditRepository.findAuditById(auditId);
     if (!audit) {
       throw new AppError('Audit session not found', 404);
@@ -311,6 +311,29 @@ class AuditService {
 
     if (audit.status !== 'In Progress') {
       throw new AppError('Audit has already been submitted or completed', 400);
+    }
+
+    // Continuous Geolocation Enforcement during Submission
+    if (latitude !== undefined && longitude !== undefined && audit.roomId.latitude && audit.roomId.longitude) {
+      const distance = haversineDistance(latitude, longitude, audit.roomId.latitude, audit.roomId.longitude);
+      const tolerance = parseInt(process.env.GPS_TOLERANCE_METERS, 10) || 50;
+      
+      if (distance > tolerance) {
+        // Auditor moved away, reset the pipeline
+        audit.qrVerified = false;
+        if (audit.gpsData) {
+          audit.gpsData.verified = false;
+        }
+        audit.images = [];
+        audit.checklistAnswers = [];
+        audit.verificationAnswers = [];
+        audit.aiAnalysis = undefined;
+        await audit.save();
+        
+        throw new AppError('Security Alert: You moved away from the target location. Audit progress reset. Please start from QR verification again.', 403);
+      }
+    } else if (latitude === undefined || longitude === undefined) {
+      throw new AppError('Current location coordinates are required for final submission to prevent spoofing.', 400);
     }
 
     // Validate checklist structure matches the assignment checklist

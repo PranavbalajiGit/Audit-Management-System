@@ -201,7 +201,7 @@ const runAIAnalysis = async (req, res, next) => {
 
 const submitAudit = async (req, res, next) => {
   try {
-    const { auditId, checklistAnswers, verificationAnswers } = req.body;
+    const { auditId, checklistAnswers, verificationAnswers, latitude, longitude } = req.body;
     if (!auditId) {
       return next(new AppError('Audit ID is required', 400));
     }
@@ -210,7 +210,9 @@ const submitAudit = async (req, res, next) => {
       auditId, 
       checklistAnswers, 
       verificationAnswers, 
-      req.user._id
+      req.user._id,
+      latitude,
+      longitude
     );
 
     // Notify admins in real-time about audit submission
