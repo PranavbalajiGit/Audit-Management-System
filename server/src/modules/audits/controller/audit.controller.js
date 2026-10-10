@@ -148,7 +148,13 @@ const verifyGPS = async (req, res, next) => {
 
 const uploadImage = async (req, res, next) => {
   try {
-    const { auditId, imageType, latitude, longitude } = req.body;
+    const { auditId, imageType, latitude, longitude, isLiveCapture, testBypass } = req.body;
+
+    // Prevent uploading from local storage unless test bypass is enabled
+    if (String(testBypass) !== 'true' && String(isLiveCapture) !== 'true') {
+      return next(new AppError('Uploading images from local storage is strictly prohibited to ensure a transparent audit. Please capture a live image using the camera.', 403));
+    }
+
     if (!auditId) {
       return next(new AppError('Audit ID is required', 400));
     }

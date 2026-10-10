@@ -222,11 +222,15 @@ export const auditService = {
     const res = await api.post('/gps/verify', { auditId, latitude, longitude, accuracy });
     return res.data.data;
   },
-  uploadImage: async (auditId, file, imageType) => {
+  uploadImage: async (auditId, file, imageType, latitude, longitude, isLiveCapture = true, testBypass = false) => {
     const formData = new FormData();
     formData.append('auditId', auditId);
     formData.append('imageType', imageType);
     formData.append('image', file);
+    if (latitude !== undefined) formData.append('latitude', latitude);
+    if (longitude !== undefined) formData.append('longitude', longitude);
+    formData.append('isLiveCapture', isLiveCapture);
+    formData.append('testBypass', testBypass);
     
     const res = await api.post('/images/upload', formData, {
       headers: {
@@ -235,16 +239,16 @@ export const auditService = {
     });
     return res.data.data;
   },
-  deleteImage: async (auditId, imageUrl) => {
-    const res = await api.post('/audits/images/delete', { auditId, imageUrl });
+  deleteImage: async (auditId, imageUrl, latitude, longitude) => {
+    const res = await api.post('/audits/images/delete', { auditId, imageUrl, latitude, longitude });
     return res.data.data;
   },
-  runAIAnalysis: async (auditId) => {
-    const res = await api.post('/ai/analyze', { auditId });
+  runAIAnalysis: async (auditId, latitude, longitude) => {
+    const res = await api.post('/ai/analyze', { auditId, latitude, longitude });
     return res.data.data;
   },
-  submitAudit: async (auditId, checklistAnswers, verificationAnswers) => {
-    const res = await api.post(`/audits/${auditId}/submit`, { checklistAnswers, verificationAnswers });
+  submitAudit: async (auditId, checklistAnswers, verificationAnswers, latitude, longitude) => {
+    const res = await api.post(`/audits/${auditId}/submit`, { checklistAnswers, verificationAnswers, latitude, longitude });
     return res.data.data;
   },
   updateAuditStatus: async (id, status, notes) => {
