@@ -78,10 +78,14 @@ const AuditSession = () => {
     setUploadError('');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setStreamActive(true);
-      }
+      setStreamActive(true);
+      
+      // Wait for React to render the conditionally rendered <video> element
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 50);
     } catch (err) {
       setUploadError('Failed to access camera. Please ensure you have granted camera permissions.');
     }
@@ -673,16 +677,33 @@ const AuditSession = () => {
                          <span className="text-[11px] font-semibold text-emerald-400">Start Live Camera</span>
                       </div>
                     ) : (
-                      <div className="relative w-full flex flex-col items-center">
-                        <video ref={videoRef} autoPlay playsInline className="w-full max-h-48 object-cover bg-black" />
-                        <button
-                          type="button"
-                          disabled={uploading}
-                          onClick={handleLiveCapture}
-                          className="absolute bottom-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-full shadow-lg border-2 border-emerald-400 transition"
-                        >
-                          {uploading ? 'Capturing...' : 'Capture Photo'}
-                        </button>
+                      <div className="w-full flex flex-col items-center p-3 gap-3 bg-slate-900/50">
+                        <video ref={videoRef} autoPlay playsInline className="w-full max-h-64 object-contain bg-black rounded-lg border border-slate-700 shadow-inner" />
+                        <div className="flex w-full gap-2">
+                          <button
+                            type="button"
+                            onClick={stopCamera}
+                            className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={uploading}
+                            onClick={handleLiveCapture}
+                            className="flex-[2] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg shadow-lg border-2 border-emerald-500/50 transition flex justify-center items-center gap-2"
+                          >
+                            {uploading ? 'Capturing...' : (
+                              <>
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Capture Photo
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
