@@ -81,12 +81,23 @@ class AIService {
 
       const parts = [{ text: prompt }];
       if (base64Image) {
-        parts.push({
-          inlineData: {
-            mimeType,
-            data: this.stripDataUri(base64Image)
-          }
-        });
+        if (Array.isArray(base64Image)) {
+          base64Image.forEach(img => {
+            parts.push({
+              inlineData: {
+                mimeType,
+                data: this.stripDataUri(img)
+              }
+            });
+          });
+        } else {
+          parts.push({
+            inlineData: {
+              mimeType,
+              data: this.stripDataUri(base64Image)
+            }
+          });
+        }
       }
 
       const response = await fetch(url, {
@@ -130,7 +141,11 @@ class AIService {
 
       const message = { role: 'user', content: prompt };
       if (base64Image) {
-        message.images = [this.stripDataUri(base64Image)];
+        if (Array.isArray(base64Image)) {
+          message.images = base64Image.map(img => this.stripDataUri(img));
+        } else {
+          message.images = [this.stripDataUri(base64Image)];
+        }
       }
 
       const body = {
@@ -255,23 +270,31 @@ class AIService {
     let b64 = base64Image;
     if (!b64 && imageUrl) {
       try {
-        const imgRes = await fetch(imageUrl);
-        if (!imgRes.ok) {
-          throw new Error(`status ${imgRes.status}`);
+        if (Array.isArray(imageUrl)) {
+          b64 = await Promise.all(imageUrl.map(async (url) => {
+            const imgRes = await fetch(url);
+            if (!imgRes.ok) throw new Error(`status ${imgRes.status}`);
+            const arrayBuffer = await imgRes.arrayBuffer();
+            return Buffer.from(arrayBuffer).toString('base64');
+          }));
+        } else {
+          const imgRes = await fetch(imageUrl);
+          if (!imgRes.ok) throw new Error(`status ${imgRes.status}`);
+          const arrayBuffer = await imgRes.arrayBuffer();
+          b64 = Buffer.from(arrayBuffer).toString('base64');
         }
-        const arrayBuffer = await imgRes.arrayBuffer();
-        b64 = Buffer.from(arrayBuffer).toString('base64');
       } catch (fetchErr) {
         console.error('[AI Service] Failed to download image for VLM analysis', fetchErr.message);
       }
     }
 
-    if (!b64) {
+    if (!b64 || (Array.isArray(b64) && b64.length === 0)) {
       throw new AppError('Image data (base64 or fetchable URL) is required for VLM analysis', 400);
     }
 
     try {
-      console.log(`[VLM] Analyzing real image via provider="${this.provider}" model="${this.ollamaModel}" bytes=${b64.length} expectedRoomType="${roomType}"`);
+      const isArray = Array.isArray(b64);
+      console.log(`[VLM] Analyzing real image via provider="${this.provider}" model="${this.ollamaModel}" images_count=${isArray ? b64.length : 1} expectedRoomType="${roomType}"`);
       const jsonSchema = {
         type: 'object',
         properties: {

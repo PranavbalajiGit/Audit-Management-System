@@ -40,6 +40,12 @@ const AuditSession = () => {
   const [uploading, setUploading] = useState(false);
   const [imageType, setImageType] = useState('Wide');
   const [uploadError, setUploadError] = useState('');
+  const [testBypass, setTestBypass] = useState(false);
+  
+  // Live Camera state
+  const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const [streamActive, setStreamActive] = useState(false);
 
   // Checklist state
   const [checklistAnswers, setChecklistAnswers] = useState({});
@@ -55,7 +61,70 @@ const AuditSession = () => {
 
   useEffect(() => {
     fetchAuditDetails();
+    return () => {
+      stopCamera();
+    };
   }, [id]);
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      setStreamActive(false);
+    }
+  };
+
+  const startCamera = async () => {
+    setUploadError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setStreamActive(true);
+      
+      // Wait for React to render the conditionally rendered <video> element
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 50);
+    } catch (err) {
+      setUploadError('Failed to access camera. Please ensure you have granted camera permissions.');
+    }
+  };
+
+  const handleLiveCapture = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        setUploadError('Failed to capture image.');
+        return;
+      }
+      const file = new File([blob], 'live-capture.jpg', { type: 'image/jpeg' });
+      setUploading(true);
+      setUploadError('');
+
+      const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+      const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
+      try {
+        const updatedImages = await auditService.uploadImage(id, file, imageType, lat, lng, true, testBypass);
+        setAudit(prev => ({ ...prev, images: updatedImages, aiAnalysis: null, verificationAnswers: [] }));
+        setAiAnswers({});
+        stopCamera();
+      } catch (err) {
+        setUploadError(err.message || 'Failed to upload captured image.');
+      } finally {
+        setUploading(false);
+      }
+    }, 'image/jpeg', 0.85);
+  };
 
   const fetchAuditDetails = async () => {
     try {
@@ -177,8 +246,11 @@ const AuditSession = () => {
     setUploading(true);
     setUploadError('');
 
+    const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+    const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
     try {
-      const updatedImages = await auditService.uploadImage(id, file, imageType);
+      const updatedImages = await auditService.uploadImage(id, file, imageType, lat, lng, true, testBypass);
       // A new photo invalidates any previous VLM analysis
       setAudit(prev => ({ ...prev, images: updatedImages, aiAnalysis: null, verificationAnswers: [] }));
       setAiAnswers({});
@@ -191,8 +263,12 @@ const AuditSession = () => {
 
   const handleImageDelete = async (url) => {
     if (!confirm('Are you sure you want to delete this image?')) return;
+    
+    const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+    const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
     try {
-      const updatedImages = await auditService.deleteImage(id, url);
+      const updatedImages = await auditService.deleteImage(id, url, lat, lng);
       setAudit(prev => ({ ...prev, images: updatedImages, aiAnalysis: null, verificationAnswers: [] }));
       setAiAnswers({});
     } catch (err) {
@@ -227,8 +303,12 @@ const AuditSession = () => {
   const handleRunAI = async () => {
     setAiRunning(true);
     setAiError('');
+    
+    const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+    const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
     try {
-      const res = await auditService.runAIAnalysis(id);
+      const res = await auditService.runAIAnalysis(id, lat, lng);
       setAudit(prev => ({
         ...prev,
         aiAnalysis: res.aiAnalysis,
@@ -282,8 +362,11 @@ const AuditSession = () => {
       return;
     }
 
+    const lat = gpsLoc?.latitude || audit?.gpsData?.latitude;
+    const lng = gpsLoc?.longitude || audit?.gpsData?.longitude;
+
     try {
-      const finishedAudit = await auditService.submitAudit(id, formattedChecklist, formattedAI);
+      const finishedAudit = await auditService.submitAudit(id, formattedChecklist, formattedAI, lat, lng);
       setAudit(finishedAudit);
       setStep(6); // Success screen
     } catch (err) {
@@ -537,32 +620,94 @@ const AuditSession = () => {
               </div>
 
               <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  disabled={uploading}
-                  className="hidden"
-                  id="image-file-input"
-                />
-                <label
-                  htmlFor="image-file-input"
-                  className={`flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-slate-800 bg-slate-900/30 hover:bg-slate-900/60 cursor-pointer transition ${
-                    uploading ? 'opacity-50 pointer-events-none' : ''
-                  }`}
-                >
-                  {uploading ? (
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent"></div>
-                  ) : (
-                    <>
-                      <svg className="h-8 w-8 text-slate-500 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span className="text-[11px] font-semibold text-slate-300">Choose Image or Open Camera</span>
-                    </>
-                  )}
-                </label>
+                {/* Developer testing toggle */}
+                <div className="mb-2 flex items-center justify-end">
+                  <label className="text-[10px] text-slate-400 flex items-center gap-1.5 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={testBypass}
+                      onChange={(e) => {
+                        setTestBypass(e.target.checked);
+                        if (e.target.checked) stopCamera();
+                      }}
+                      className="rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-900" 
+                    />
+                    Enable Upload Bypass (Testing Only)
+                  </label>
+                </div>
+                
+                {testBypass ? (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploading}
+                      className="hidden"
+                      id="image-file-input"
+                    />
+                    <label
+                      htmlFor="image-file-input"
+                      className={`flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-slate-800 bg-slate-900/30 hover:bg-slate-900/60 cursor-pointer transition ${
+                        uploading ? 'opacity-50 pointer-events-none' : ''
+                      }`}
+                    >
+                      {uploading ? (
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent"></div>
+                      ) : (
+                        <>
+                          <svg className="h-8 w-8 text-slate-500 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className="text-[11px] font-semibold text-slate-300">
+                            Upload File (Bypass Enabled)
+                          </span>
+                        </>
+                      )}
+                    </label>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center w-full rounded-xl border-2 border-slate-800 bg-slate-900/30 overflow-hidden">
+                    <canvas ref={canvasRef} className="hidden"></canvas>
+                    {!streamActive ? (
+                      <div className="h-32 w-full flex flex-col items-center justify-center hover:bg-slate-900/60 cursor-pointer transition" onClick={startCamera}>
+                         <svg className="h-8 w-8 text-emerald-500 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                         </svg>
+                         <span className="text-[11px] font-semibold text-emerald-400">Start Live Camera</span>
+                      </div>
+                    ) : (
+                      <div className="w-full flex flex-col items-center p-3 gap-3 bg-slate-900/50">
+                        <video ref={videoRef} autoPlay playsInline className="w-full max-h-64 object-contain bg-black rounded-lg border border-slate-700 shadow-inner" />
+                        <div className="flex w-full gap-2">
+                          <button
+                            type="button"
+                            onClick={stopCamera}
+                            className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={uploading}
+                            onClick={handleLiveCapture}
+                            className="flex-[2] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg shadow-lg border-2 border-emerald-500/50 transition flex justify-center items-center gap-2"
+                          >
+                            {uploading ? 'Capturing...' : (
+                              <>
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Capture Photo
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

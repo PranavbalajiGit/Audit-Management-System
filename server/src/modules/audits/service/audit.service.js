@@ -38,6 +38,33 @@ class AuditService {
     }
   }
 
+  // --- Helper: Continuous Location Enforcement ---
+  async enforceLocation(audit, latitude, longitude) {
+    if (latitude === undefined || longitude === undefined) {
+      throw new AppError('Current location coordinates (latitude, longitude) are required to perform this action to prevent location spoofing.', 400);
+    }
+    
+    if (audit.roomId.latitude && audit.roomId.longitude) {
+      const distance = haversineDistance(latitude, longitude, audit.roomId.latitude, audit.roomId.longitude);
+      const tolerance = parseInt(process.env.GPS_TOLERANCE_METERS, 10) || 50;
+      
+      if (distance > tolerance) {
+        // Auditor moved away, reset the pipeline
+        audit.qrVerified = false;
+        if (audit.gpsData) {
+          audit.gpsData.verified = false;
+        }
+        audit.images = [];
+        audit.checklistAnswers = [];
+        audit.verificationAnswers = [];
+        audit.aiAnalysis = undefined;
+        await audit.save();
+        
+        throw new AppError('Security Alert: You moved away from the target location. Audit progress reset. Please start from QR verification again.', 403);
+      }
+    }
+  }
+
   // --- Assignment Logic ---
 
   async createAssignment(assignmentData) {
@@ -198,6 +225,18 @@ class AuditService {
 
     await audit.save();
 
+    if (!verified) {
+      // Auditor moved away, reset the pipeline
+      audit.qrVerified = false;
+      audit.images = [];
+      audit.checklistAnswers = [];
+      audit.verificationAnswers = [];
+      audit.aiAnalysis = undefined;
+      await audit.save();
+      
+      throw new AppError('Security Alert: You are not at the target location. Audit progress reset. Please start from QR verification again.', 403);
+    }
+
     return {
       distanceMeters: Math.round(distance),
       tolerance,
@@ -205,7 +244,7 @@ class AuditService {
     };
   }
 
-  async uploadImage(auditId, fileUrl, localPath, imageType, auditorId) {
+  async uploadImage(auditId, fileUrl, localPath, imageType, auditorId, latitude, longitude) {
     const audit = await auditRepository.findAuditById(auditId);
     if (!audit) {
       throw new AppError('Audit session not found', 404);
@@ -214,6 +253,9 @@ class AuditService {
     if (audit.auditorId._id.toString() !== auditorId.toString()) {
       throw new AppError('Unauthorized', 403);
     }
+
+    // Enforce Location Tracker
+    await this.enforceLocation(audit, latitude, longitude);
 
     audit.images.push({
       cloudinaryUrl: fileUrl,
@@ -226,7 +268,7 @@ class AuditService {
     return audit.images;
   }
 
-  async deleteImage(auditId, imageUrl, auditorId) {
+  async deleteImage(auditId, imageUrl, auditorId, latitude, longitude) {
     const audit = await auditRepository.findAuditById(auditId);
     if (!audit) {
       throw new AppError('Audit session not found', 404);
@@ -235,13 +277,16 @@ class AuditService {
     if (audit.auditorId._id.toString() !== auditorId.toString()) {
       throw new AppError('Unauthorized', 403);
     }
+
+    // Enforce Location Tracker
+    await this.enforceLocation(audit, latitude, longitude);
 
     audit.images = audit.images.filter(img => img.cloudinaryUrl !== imageUrl);
     await audit.save();
     return audit.images;
   }
 
-  async runAIAnalysis(auditId, auditorId) {
+  async runAIAnalysis(auditId, auditorId, latitude, longitude) {
     const audit = await auditRepository.findAuditById(auditId);
     if (!audit) {
       throw new AppError('Audit session not found', 404);
@@ -251,23 +296,22 @@ class AuditService {
       throw new AppError('Unauthorized', 403);
     }
 
+    // Enforce Location Tracker
+    await this.enforceLocation(audit, latitude, longitude);
+
     if (audit.images.length === 0) {
       throw new AppError('Please upload at least one room image before running AI analysis', 400);
     }
 
-    // Pick first image (wide or asset) for classification/VLM analysis
-    const targetImage = audit.images.find(img => img.imageType === 'Wide' || img.imageType === 'Entrance') || audit.images[0];
-
-    // Read the image bytes from disk when available (local/mock storage)
-    let base64Image = this.readImageAsBase64(targetImage);
+    // Pass ALL uploaded images for comprehensive VLM analysis
+    const base64Images = audit.images.map(img => this.readImageAsBase64(img)).filter(b64 => b64);
+    const imageUrls = audit.images.map(img => img.cloudinaryUrl);
 
     const roomType = audit.roomId.roomType;
-    const sizeKb = base64Image ? Math.round(base64Image.length / 1024) : 0;
-    console.log(`[AI Analysis] audit=${auditId} provider=${aiService.provider} roomType=${roomType}`);
-    console.log(`[AI Analysis] image type=${targetImage.imageType} localPath=${targetImage.localPath || 'none'} url=${targetImage.cloudinaryUrl} bytes=${sizeKb}KB`);
+    console.log(`[AI Analysis] audit=${auditId} provider=${aiService.provider} roomType=${roomType} imageCount=${audit.images.length}`);
     
     // Call VLM Analysis
-    const analysis = await aiService.analyzeImage(targetImage.cloudinaryUrl, roomType, base64Image);
+    const analysis = await aiService.analyzeImage(imageUrls, roomType, base64Images.length > 0 ? base64Images : null);
 
     audit.aiAnalysis = {
       roomClassification: analysis.roomClassification,
@@ -299,7 +343,7 @@ class AuditService {
     };
   }
 
-  async submitAudit(auditId, checklistAnswers, verificationAnswers, auditorId) {
+  async submitAudit(auditId, checklistAnswers, verificationAnswers, auditorId, latitude, longitude) {
     const audit = await auditRepository.findAuditById(auditId);
     if (!audit) {
       throw new AppError('Audit session not found', 404);
@@ -312,6 +356,9 @@ class AuditService {
     if (audit.status !== 'In Progress') {
       throw new AppError('Audit has already been submitted or completed', 400);
     }
+
+    // Continuous Geolocation Enforcement during Submission
+    await this.enforceLocation(audit, latitude, longitude);
 
     // Validate checklist structure matches the assignment checklist
     const assignment = audit.assignmentId;
