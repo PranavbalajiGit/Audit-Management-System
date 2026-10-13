@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { DoorOpen, Plus, Pencil, Trash2, QrCode, MapPin, Printer } from 'lucide-react';
+import { DoorOpen, Plus, Pencil, Trash2, QrCode, MapPin, Printer, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { roomService, buildingService } from '../../services/api';
@@ -338,7 +338,7 @@ const Rooms = () => {
 
       <Dialog open={qrOpen} onOpenChange={setQrOpen}>
         <DialogContent className="max-w-sm text-center">
-          <DialogHeader>
+          <DialogHeader className="print:hidden">
             <DialogTitle className="flex items-center justify-center gap-2 text-base">
               <QrCode className="h-4 w-4 text-primary" /> Room QR signboard
             </DialogTitle>
@@ -349,26 +349,56 @@ const Rooms = () => {
 
           {activeQr && (
             <div className="space-y-4">
-              <div className="inline-block rounded-xl bg-white p-3 shadow-md">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-                    activeQr.code
-                  )}`}
-                  alt="Room QR code"
-                  className="h-44 w-44"
-                />
+              <div className="print-signboard overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-lg">
+                <div className="flex items-center justify-between gap-3 bg-slate-900 px-5 py-3 text-white">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/20">
+                      <ShieldCheck className="h-4 w-4" />
+                    </span>
+                    <div className="text-left leading-tight">
+                      <p className="font-display text-sm font-bold">S7 Audit</p>
+                      <p className="font-mono-data text-[0.55rem] uppercase tracking-[0.22em] text-white/60">
+                        Inspection tag
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-white/10 px-2.5 py-1 font-mono-data text-[0.55rem] uppercase tracking-[0.18em] text-white/80">
+                    Scan
+                  </span>
+                </div>
+
+                <div className="px-6 py-6">
+                  <div className="mx-auto w-fit rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(
+                        activeQr.code
+                      )}`}
+                      alt="Room QR code"
+                      className="h-44 w-44"
+                    />
+                  </div>
+
+                  <div className="mt-5">
+                    <p className="font-mono-data text-[0.55rem] uppercase tracking-[0.26em] text-slate-400">
+                      Room
+                    </p>
+                    <h4 className="font-display text-3xl font-black leading-tight tracking-tight text-slate-900">
+                      {activeQr.roomNumber}
+                    </h4>
+                    <p className="mt-1 flex items-center justify-center gap-1.5 text-sm font-medium text-slate-500">
+                      <MapPin className="h-3.5 w-3.5" /> {activeQr.buildingName}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 border-t border-dashed border-slate-300 pt-3">
+                    <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.2em] text-slate-400">
+                      Scan with the S7 app to begin inspection
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <h4 className="font-display text-lg font-bold text-foreground">
-                  Room {activeQr.roomNumber}
-                </h4>
-                <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                  <MapPin className="h-3 w-3" /> {activeQr.buildingName}
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-border/60 bg-secondary/40 p-3 text-left">
+              <div className="rounded-lg border border-border/60 bg-secondary/40 p-3 text-left print:hidden">
                 <span className="block font-mono-data text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">
                   QR payload
                 </span>
@@ -377,7 +407,7 @@ const Rooms = () => {
                 </code>
               </div>
 
-              <Button className="w-full" onClick={() => window.print()}>
+              <Button className="w-full print:hidden" onClick={() => window.print()}>
                 <Printer className="h-4 w-4" /> Print signboard
               </Button>
             </div>

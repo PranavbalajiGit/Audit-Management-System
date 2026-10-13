@@ -484,3 +484,53 @@
 .leaflet-popup-content {
   margin: 0.6rem 0.75rem;
 }
+
+/* Print: isolate the QR signboard so only it appears on the page */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-signboard,
+  .print-signboard * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Neutralise the dialog shell so it does not offset the tag */
+  [role='dialog'] {
+    position: static !important;
+    transform: none !important;
+    max-width: none !important;
+    max-height: none !important;
+    width: auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  [data-radix-popper-content-wrapper],
+  [data-state='open'][class*='overlay'] {
+    display: none !important;
+  }
+
+  .print-signboard {
+    position: fixed !important;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 360px;
+    margin: 0;
+    box-shadow: none !important;
+  }
+}
+
