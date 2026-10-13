@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AnimatedGridPattern } from '@/components/magicui/animated-grid-pattern';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Meteors } from '@/components/fx/meteors';
 import { ShinyText } from '@/components/fx/shiny-text';
 import { NumberTicker } from '@/components/fx/number-ticker';
@@ -85,6 +86,9 @@ const Login = () => {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background">
+      <div className="absolute right-5 top-5 z-20 lg:right-8 lg:top-8">
+        <ThemeToggle />
+      </div>
       {/* Background layers */}
       <div
         className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.14] md:bg-[right_center]"

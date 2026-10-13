@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
   History,
@@ -11,27 +10,19 @@ import {
   Building2,
   CalendarClock,
   Compass,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { auditService } from '../../services/api';
 import { StatCard } from '@/components/StatCard';
-import { StatusBadge, ConfidenceMeter } from '@/components/StatusBadge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { EmptyState } from '@/components/EmptyState';
 import { BlurFade } from '@/components/fx/blur-fade';
 import { SpotlightCard } from '@/components/fx/spotlight-card';
 import { BorderBeam } from '@/components/fx/border-beam';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/utils';
 
 const AuditorDashboard = () => {
   const [assignments, setAssignments] = useState([]);
@@ -190,12 +181,19 @@ const AuditorDashboard = () => {
         )}
       </section>
 
-      {/* History */}
+      {/* Recent completions preview */}
       <section className="space-y-4">
-        <h3 className="flex items-center gap-2 font-display text-base font-semibold text-foreground">
-          <span className="h-2 w-2 rounded-full bg-muted-foreground" />
-          Audit history ({history.length})
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="flex items-center gap-2 font-display text-base font-semibold text-foreground">
+            <span className="h-2 w-2 rounded-full bg-muted-foreground" />
+            Recent completions
+          </h3>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/auditor/history">
+              View all history <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
 
         {history.length === 0 ? (
           <EmptyState
@@ -204,52 +202,33 @@ const AuditorDashboard = () => {
             description="Finished inspections and their authenticity scores show up here."
           />
         ) : (
-          <div className="reg-marks overflow-hidden rounded-xl border border-border/70 bg-card/70 shadow-panel">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Location</TableHead>
-                  <TableHead className="hidden sm:table-cell">Completed</TableHead>
-                  <TableHead className="w-[150px]">Confidence</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.map((task, i) => (
-                  <motion.tr
-                    key={task._id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, delay: i * 0.04 }}
-                    className="border-b border-border/60 transition-colors hover:bg-secondary/30"
-                  >
-                    <TableCell>
-                      <p className="flex items-center gap-1.5 font-semibold text-foreground">
-                        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+          <BlurFade>
+            <div className="reg-marks divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card/70 shadow-panel">
+              {history.slice(0, 4).map((task) => (
+                <Link
+                  key={task._id}
+                  to="/auditor/history"
+                  className="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-secondary/30"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/60 text-muted-foreground ring-1 ring-border">
+                      <MapPin className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">
                         Room {task.roomId?.roomNumber || 'N/A'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {task.roomId?.buildingId?.name || 'Building'}
+                      <p className="truncate text-xs text-muted-foreground">
+                        {task.roomId?.buildingId?.name || 'Building'} ·{' '}
+                        {new Date(task.updatedAt).toLocaleDateString()}
                       </p>
-                    </TableCell>
-                    <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
-                      {new Date(task.updatedAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="w-[150px]">
-                      {task.auditId?.confidenceScore !== undefined ? (
-                        <ConfidenceMeter score={task.auditId.confidenceScore} showLabel={false} />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">N/A</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <StatusBadge status={task.status} />
-                    </TableCell>
-                  </motion.tr>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                    </div>
+                  </div>
+                  <StatusBadge status={task.status} />
+                </Link>
+              ))}
+            </div>
+          </BlurFade>
         )}
       </section>
     </div>

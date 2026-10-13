@@ -13,7 +13,6 @@ import { motion } from 'framer-motion';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
-  LineChart,
   XAxis,
   YAxis,
   CartesianGrid,

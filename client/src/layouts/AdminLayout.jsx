@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from '@/components/CommandPalette';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import PageTransition from '@/components/PageTransition';
 import {
   Tooltip,
@@ -221,6 +222,8 @@ const AdminLayout = () => {
                 {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
+
+            <ThemeToggle variant="icon" />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

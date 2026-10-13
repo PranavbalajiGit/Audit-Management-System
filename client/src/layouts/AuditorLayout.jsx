@@ -6,6 +6,7 @@ import { ClipboardList, History, LogOut, Menu, X, ScanLine, MapPin } from 'lucid
 import { useAuth } from '../context/AuthContext';
 import { cn } from '@/lib/utils';
 import PageTransition from '@/components/PageTransition';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const menuItems = [
@@ -96,6 +97,8 @@ const AuditorLayout = () => {
             <MapPin className="h-3 w-3" />
             {online ? 'gps ready' : 'offline'}
           </span>
+
+          <ThemeToggle variant="icon" />
 
           <div className="hidden items-center gap-2 sm:flex">
             <Avatar className="h-8 w-8 ring-1 ring-success/30">
