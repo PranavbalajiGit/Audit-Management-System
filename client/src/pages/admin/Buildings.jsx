@@ -1,20 +1,28 @@
 import React, { useState, useEffect } from 'react';
+import { Building2, Plus, Pencil, Trash2, MapPin, Hash } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { buildingService } from '../../services/api';
+import { AppModal, Field } from '@/components/AppModal';
+import { LoadingScreen } from '@/components/LoadingScreen';
+import { EmptyState } from '@/components/EmptyState';
+import { BlurFade } from '@/components/fx/blur-fade';
+import { Stagger, StaggerItem } from '@/components/fx/stagger';
+import { SpotlightCard } from '@/components/fx/spotlight-card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
+const emptyForm = { name: '', code: '', address: '', description: '' };
 
 const Buildings = () => {
   const [buildings, setBuildings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
-  // Modal states
+
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingBuilding, setEditingBuilding] = useState(null); // null means creating
-  const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    address: '',
-    description: ''
-  });
+  const [editingBuilding, setEditingBuilding] = useState(null);
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
     fetchBuildings();
@@ -34,7 +42,7 @@ const Buildings = () => {
 
   const handleOpenCreate = () => {
     setEditingBuilding(null);
-    setFormData({ name: '', code: '', address: '', description: '' });
+    setFormData(emptyForm);
     setModalOpen(true);
   };
 
@@ -44,18 +52,19 @@ const Buildings = () => {
       name: building.name,
       code: building.code,
       address: building.address || '',
-      description: building.description || ''
+      description: building.description || '',
     });
     setModalOpen(true);
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this building? All rooms linked to it will require updates.')) return;
+    if (!confirm('Delete this building? All rooms linked to it will require updates.')) return;
     try {
       await buildingService.deleteBuilding(id);
+      toast.success('Building removed');
       fetchBuildings();
     } catch (err) {
-      alert(err.message || 'Deletion failed.');
+      toast.error(err.message || 'Deletion failed.');
     }
   };
 
@@ -64,162 +73,151 @@ const Buildings = () => {
     try {
       if (editingBuilding) {
         await buildingService.updateBuilding(editingBuilding._id, formData);
+        toast.success('Building updated');
       } else {
         await buildingService.createBuilding(formData);
+        toast.success('Building registered');
       }
       setModalOpen(false);
       fetchBuildings();
     } catch (err) {
-      alert(err.message || 'Operation failed.');
+      toast.error(err.message || 'Operation failed.');
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold font-outfit text-white">Buildings Registry</h2>
-          <p className="text-xs text-slate-400">Add and manage campus physical buildings and structures.</p>
+      <BlurFade>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="font-mono-data text-[0.65rem] uppercase tracking-[0.24em] text-muted-foreground">
+              Registry · {buildings.length} structures
+            </p>
+            <h2 className="mt-1 font-display text-2xl font-bold text-foreground">Buildings</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add and manage campus buildings and physical structures.
+            </p>
+          </div>
+          <Button onClick={handleOpenCreate}>
+            <Plus className="h-4 w-4" /> Add building
+          </Button>
         </div>
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center gap-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-semibold text-white shadow-lg transition"
-        >
-          Add Building
-        </button>
-      </div>
+      </BlurFade>
 
       {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center text-slate-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent"></div>
-          <span className="ml-3 text-sm">Loading buildings directories...</span>
-        </div>
+        <LoadingScreen label="Loading buildings directory..." />
+      ) : buildings.length === 0 ? (
+        <EmptyState
+          icon={Building2}
+          title="No buildings registered"
+          description="Register your first campus building to start mapping rooms."
+          action={
+            <Button size="sm" onClick={handleOpenCreate}>
+              <Plus className="h-4 w-4" /> Add building
+            </Button>
+          }
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {buildings.length === 0 ? (
-            <div className="col-span-full glass rounded-xl p-8 text-center text-slate-500">
-              No buildings registered in the registry. Click "Add Building" to create one.
-            </div>
-          ) : (
-            buildings.map((b) => (
-              <div key={b._id} className="glass glass-hover rounded-xl p-5 border-slate-800/40 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between border-b border-slate-800/20 pb-2">
-                    <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400">
-                      Code: {b.code}
-                    </span>
+        <Stagger className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {buildings.map((b) => (
+            <StaggerItem key={b._id}>
+              <SpotlightCard className="reg-marks flex h-full flex-col justify-between rounded-xl border border-border/70 bg-card/70 p-5 shadow-panel transition-colors hover:border-primary/35">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-border/50 pb-3">
+                    <Badge variant="outline" className="font-mono-data">
+                      <Hash className="h-3 w-3" />
+                      {b.code}
+                    </Badge>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEdit(b)}>
+                        <Pencil className="h-3.5 w-3.5 text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(b._id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <h4 className="text-base font-bold text-white font-outfit leading-snug">{b.name}</h4>
-                  <p className="text-xs text-slate-400 leading-relaxed truncate">{b.description || 'No description provided.'}</p>
-                  {b.address && <p className="text-[10px] text-slate-500">📍 {b.address}</p>}
+                  <h4 className="font-display text-base font-bold leading-snug text-foreground">
+                    {b.name}
+                  </h4>
+                  <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                    {b.description || 'No description provided.'}
+                  </p>
                 </div>
-
-                <div className="flex justify-end gap-3.5 pt-4 mt-2 border-t border-slate-800/20">
-                  <button
-                    onClick={() => handleOpenEdit(b)}
-                    className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(b._id)}
-                    className="text-xs font-semibold text-red-400 hover:text-red-300 transition"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+                {b.address && (
+                  <p className="mt-4 flex items-center gap-1.5 border-t border-border/50 pt-3 text-[0.7rem] text-muted-foreground">
+                    <MapPin className="h-3 w-3 text-primary" /> {b.address}
+                  </p>
+                )}
+              </SpotlightCard>
+            </StaggerItem>
+          ))}
+        </Stagger>
       )}
 
-      {/* CRUD Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass w-full max-w-md rounded-xl p-6 space-y-4 border-slate-800 animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between border-b border-slate-800/40 pb-2.5">
-              <h3 className="text-lg font-bold text-white font-outfit">
-                {editingBuilding ? 'Edit Building details' : 'Register New Building'}
-              </h3>
-              <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-white font-bold text-lg">
-                ×
-              </button>
-            </div>
+      <AppModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={editingBuilding ? 'Edit building details' : 'Register new building'}
+        description="Buildings group the rooms that auditors will inspect."
+        icon={Building2}
+        footer={
+          <>
+            <Button variant="outline" type="button" onClick={() => setModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="building-form">
+              {editingBuilding ? 'Save changes' : 'Register building'}
+            </Button>
+          </>
+        }
+      >
+        <form id="building-form" onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Building code" required hint="Short unique identifier, e.g. BLDG-A">
+            <Input
+              required
+              disabled={!!editingBuilding}
+              value={formData.code}
+              onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
+              placeholder="BLDG-A"
+              className="font-mono-data uppercase"
+            />
+          </Field>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300">Building Code</label>
-                <input
-                  type="text"
-                  required
-                  disabled={!!editingBuilding}
-                  value={formData.code}
-                  onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                  placeholder="e.g. BLDG-A"
-                  className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                />
-              </div>
+          <Field label="Building name" required>
+            <Input
+              required
+              value={formData.name}
+              onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+              placeholder="Science Complex"
+            />
+          </Field>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300">Building Name</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Science Complex"
-                  className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
+          <Field label="Address / location">
+            <Input
+              value={formData.address}
+              onChange={(e) => setFormData((p) => ({ ...p, address: e.target.value }))}
+              placeholder="North Campus, Ring Road"
+            />
+          </Field>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300">Address / Location</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="e.g. North Campus, Ring Road"
-                  className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="e.g. Contains Physics and Chemistry Laboratories"
-                  rows={3}
-                  className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/40">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 border border-slate-800 rounded-lg text-xs text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-semibold text-white shadow-lg"
-                >
-                  Save Building
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          <Field label="Description">
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Contains Physics and Chemistry laboratories"
+              rows={3}
+              className="flex w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary/60"
+            />
+          </Field>
+        </form>
+      </AppModal>
     </div>
   );
 };

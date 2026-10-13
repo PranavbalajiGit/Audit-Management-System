@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { TooltipProvider } from './components/ui/tooltip';
+import { Toaster } from './components/Toaster';
 
 // Layouts
 import AdminLayout from './layouts/AdminLayout';
@@ -24,7 +26,8 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
+        <TooltipProvider delayDuration={150}>
+          <Routes>
           {/* Public Login Route */}
           <Route path="/login" element={<Login />} />
 
@@ -63,6 +66,8 @@ function App() {
           {/* Fallback Redirects */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
+        <Toaster />
+        </TooltipProvider>
       </BrowserRouter>
     </AuthProvider>
   );

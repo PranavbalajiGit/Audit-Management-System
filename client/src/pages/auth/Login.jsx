@@ -1,15 +1,40 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import {
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ArrowRight,
+  ShieldCheck,
+  ScanLine,
+  Fingerprint,
+  MapPin,
+  Lock,
+  Mail,
+} from 'lucide-react';
+
 import { useAuth } from '../../context/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AnimatedGridPattern } from '@/components/magicui/animated-grid-pattern';
+import { Meteors } from '@/components/fx/meteors';
+import { ShinyText } from '@/components/fx/shiny-text';
+import { NumberTicker } from '@/components/fx/number-ticker';
+import { BlurFade } from '@/components/fx/blur-fade';
 import { cn } from '@/lib/utils';
+
+const ease = [0.16, 1, 0.3, 1];
+
+const telemetry = [
+  { label: 'Authenticity', value: 98, suffix: '%', tone: 'text-success' },
+  { label: 'Rooms mapped', value: 240, suffix: '+', tone: 'text-primary' },
+  { label: 'GPS tolerance', value: 50, suffix: 'm', tone: 'text-accent' },
+];
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -21,6 +46,10 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const redirectFor = (user) => {
+    navigate(user.role === 'Admin' ? '/admin' : '/auditor');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
@@ -29,14 +58,9 @@ const Login = () => {
     }
     setError('');
     setSubmitting(true);
-
     try {
       const user = await login(email, password);
-      if (user.role === 'Admin') {
-        navigate('/admin');
-      } else {
-        navigate('/auditor');
-      }
+      redirectFor(user);
     } catch (err) {
       setError(err.message || 'Invalid email or password');
     } finally {
@@ -49,14 +73,9 @@ const Login = () => {
     setPassword(quickPassword);
     setError('');
     setSubmitting(true);
-
     try {
       const user = await login(quickEmail, quickPassword);
-      if (user.role === 'Admin') {
-        navigate('/admin');
-      } else {
-        navigate('/auditor');
-      }
+      redirectFor(user);
     } catch (err) {
       setError(err.message || 'Invalid email or password');
     } finally {
@@ -65,181 +84,239 @@ const Login = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[#050b18] px-4 py-8">
-      {/* 1. Full-screen background image layer */}
+    <div className="relative min-h-screen w-full overflow-hidden bg-background">
+      {/* Background layers */}
       <div
-        className="absolute inset-0 bg-[#050b18] bg-cover bg-no-repeat bg-center md:bg-[right_center] z-0"
-        style={{
-          backgroundImage: "url('/media/Audit%20Management%20Background%20Still.jpg')",
-        }}
+        className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.14] md:bg-[right_center]"
+        style={{ backgroundImage: "url('/media/Audit%20Management%20Background%20Still.jpg')" }}
         aria-hidden="true"
       />
-
-      {/* 2. Slow CSS pulse glow behind the shield (radial gradient of blue-500/20, scale 1-1.05, opacity 0.6-0.9 over 6s) */}
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 w-full md:w-3/5 flex items-center justify-center md:justify-end overflow-hidden z-0"
-        aria-hidden="true"
-      >
-        <div className="w-[500px] h-[500px] sm:w-[650px] sm:h-[650px] md:w-[800px] md:h-[800px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.20)_0%,rgba(59,130,246,0.08)_40%,transparent_70%)] animate-shield-glow motion-reduce:animate-none" />
+      <div className="absolute inset-0 z-0 blueprint-grid opacity-70" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <Meteors number={14} className="opacity-50" />
       </div>
-
-      {/* 3. Magic UI Animated Grid Pattern with low opacity (0.25), masked so it fades toward the left edge */}
+      <div
+        className="pointer-events-none absolute -right-24 top-1/2 z-0 h-[36rem] w-[36rem] -translate-y-1/2 rounded-full bg-radial-signal blur-2xl animate-drift"
+        aria-hidden="true"
+      />
       <AnimatedGridPattern
-        numSquares={35}
-        maxOpacity={0.25}
-        duration={3.5}
+        numSquares={30}
+        maxOpacity={0.18}
+        duration={4}
         repeatDelay={1}
         className={cn(
-          "pointer-events-none absolute inset-0 h-full w-full opacity-25 z-0",
-          "[mask-image:linear-gradient(to_right,transparent_0%,black_65%)]",
-          "[-webkit-mask-image:linear-gradient(to_right,transparent_0%,black_65%)]",
-          "fill-blue-400/25 stroke-blue-400/20"
+          'pointer-events-none absolute inset-0 z-0 opacity-20',
+          '[mask-image:linear-gradient(to_bottom,transparent_0%,black_60%)]',
+          '[-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_60%)]',
+          'fill-primary/25 stroke-primary/15'
         )}
       />
 
-      {/* 4. Dark gradient overlay from the left so the form area stays readable */}
-      <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-[#050b18] via-[#050b18]/90 md:via-[#050b18]/75 to-[#050b18]/40 md:to-transparent z-0"
-        aria-hidden="true"
-      />
+      <div className="relative z-10 mx-auto grid min-h-screen w-full max-w-6xl grid-cols-1 items-center gap-10 px-5 py-10 lg:grid-cols-[1.1fr_minmax(380px,440px)] lg:gap-16 lg:px-8">
+        {/* Narrative panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease }}
+          className="hidden lg:block"
+        >
+          <BlurFade delay={0.05}>
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/50 px-3 py-1.5 backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+              <span className="font-mono-data text-[0.65rem] uppercase tracking-[0.24em] text-muted-foreground">
+                Smart Infrastructure Audit
+              </span>
+            </div>
+          </BlurFade>
 
-      {/* 5. Login Card with entrance animation (z-10 layer for clickable form inputs and buttons) */}
-      <Card className="relative z-10 w-full max-w-md bg-slate-900/70 backdrop-blur-md border border-slate-700/50 rounded-2xl shadow-2xl animate-card-entrance motion-reduce:animate-none">
-        <CardHeader className="text-center pb-2 pt-8 px-6 sm:px-8">
-          {/* Shield Icon inside a small rounded square with a blue tint */}
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20 mb-4">
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              />
-            </svg>
-          </div>
-          <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-            Smart Audit Login
-          </CardTitle>
-          <CardDescription className="text-sm text-slate-400 mt-1.5">
-            Sign in to access your audit workspace
-          </CardDescription>
-        </CardHeader>
+          <h1 className="mt-6 max-w-xl text-balance font-display text-5xl font-bold leading-[1.05] tracking-tight text-foreground xl:text-6xl">
+            Every room, <ShinyText>verified</ShinyText> before it is trusted.
+          </h1>
 
-        <CardContent className="px-6 pb-8 pt-4 sm:px-8">
-          {/* Quick Login Buttons */}
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('admin@s7.com', 'Password123!')}
-              disabled={submitting}
-              className="flex flex-col items-center justify-center w-full h-16 p-3 rounded-xl border border-slate-700/60 bg-slate-950/40 hover:bg-slate-800/60 hover:border-blue-500 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed text-center group"
-            >
-              <span className="text-sm font-semibold text-white group-hover:text-blue-400 transition-colors">
-                Quick Admin
-              </span>
-              <span className="text-xs text-slate-400 mt-0.5">
-                admin@s7.com
-              </span>
-            </button>
+          <p className="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground">
+            Auditors prove presence on site with QR tags, live GPS and fresh captures. Admins
+            get one calibrated view of which inspections hold up — and which need a second look.
+          </p>
 
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('auditor@s7.com', 'Password123!')}
-              disabled={submitting}
-              className="flex flex-col items-center justify-center w-full h-16 p-3 rounded-xl border border-slate-700/60 bg-slate-950/40 hover:bg-slate-800/60 hover:border-blue-500 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed text-center group"
-            >
-              <span className="text-sm font-semibold text-white group-hover:text-blue-400 transition-colors">
-                Quick Auditor
+          <div className="mt-8 flex flex-wrap gap-3">
+            {[
+              { icon: ScanLine, label: 'QR-tagged rooms' },
+              { icon: MapPin, label: 'GPS proof of presence' },
+              { icon: Fingerprint, label: 'AI authenticity score' },
+            ].map(({ icon: Icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-card/40 px-3 py-2 text-xs font-medium text-muted-foreground backdrop-blur"
+              >
+                <Icon className="h-3.5 w-3.5 text-primary" />
+                {label}
               </span>
-              <span className="text-xs text-slate-400 mt-0.5">
-                auditor@s7.com
-              </span>
-            </button>
+            ))}
           </div>
 
-          {/* Divider */}
-          <div className="relative my-5 flex items-center justify-center">
-            <Separator className="w-full bg-slate-800" />
-            <span className="absolute bg-slate-900/90 px-3 text-xs text-slate-500">
-              Or credentials
-            </span>
+          <div className="mt-10 grid max-w-lg grid-cols-3 gap-6 border-t border-border/60 pt-6">
+            {telemetry.map((t, i) => (
+              <BlurFade key={t.label} delay={0.3 + i * 0.1}>
+                <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">
+                  {t.label}
+                </p>
+                <p className={cn('mt-1 font-display text-2xl font-bold', t.tone)}>
+                  <NumberTicker value={t.value} suffix={t.suffix} delay={0.4 + i * 0.12} />
+                </p>
+              </BlurFade>
+            ))}
           </div>
+        </motion.div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium text-slate-200">
-                Email Address
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. auditor@s7.com"
-                className="h-11 bg-slate-950/60 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-blue-500 focus-visible:border-blue-500"
-              />
+        {/* Auth panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 24, filter: 'blur(10px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          transition={{ duration: 0.65, ease }}
+        >
+          <Card className="reg-marks relative overflow-hidden border-border/70 bg-card/80 shadow-instrument backdrop-blur-2xl">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent"
+            />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 overflow-hidden" aria-hidden>
+              <div className="absolute inset-x-0 h-px animate-scanline bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-slate-200">
-                Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="h-11 bg-slate-950/60 border-slate-700 text-white placeholder:text-slate-500 pr-10 focus-visible:ring-blue-500 focus-visible:border-blue-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-0 top-0 h-11 w-10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors focus:outline-none"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <Alert variant="destructive" className="bg-destructive/15 border-destructive/30 text-red-300 py-2.5 px-3">
-                <AlertDescription className="text-xs text-red-300 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
-                  <span>{error}</span>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Sign In Button */}
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="h-11 w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium shadow-lg shadow-blue-500/20 transition-all duration-200 active:scale-[0.99] disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed border-0 mt-2"
-            >
-              {submitting ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  <span>Signing in...</span>
+            <CardContent className="px-6 py-8 sm:px-8">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/25">
+                  <span className="absolute inset-0 rounded-xl bg-primary/20 animate-pulse-ring" />
+                  <ShieldCheck className="relative h-6 w-6" strokeWidth={2.2} />
                 </div>
-              ) : (
-                'Sign In'
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+                <div>
+                  <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
+                    S7 Audit Console
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Sign in to your workspace</p>
+                </div>
+              </div>
+
+              {/* Quick access */}
+              <div className="mb-5 grid grid-cols-2 gap-3">
+                {[
+                  { role: 'Admin', email: 'admin@s7.com', desc: 'Full control', icon: ShieldCheck },
+                  { role: 'Auditor', email: 'auditor@s7.com', desc: 'Field tasks', icon: ScanLine },
+                ].map((q) => (
+                  <motion.button
+                    key={q.role}
+                    type="button"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleQuickLogin(q.email, 'Password123!')}
+                    disabled={submitting}
+                    className="group flex flex-col items-start gap-1 rounded-xl border border-border/60 bg-background/40 p-3 text-left transition-colors hover:border-primary/50 disabled:opacity-50"
+                  >
+                    <span className="flex w-full items-center justify-between">
+                      <q.icon className="h-4 w-4 text-primary" />
+                      <ArrowRight className="h-3.5 w-3.5 -translate-x-1 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                    </span>
+                    <span className="mt-1 font-display text-sm font-semibold text-foreground">
+                      {q.role}
+                    </span>
+                    <span className="text-[0.7rem] text-muted-foreground">{q.desc}</span>
+                  </motion.button>
+                ))}
+              </div>
+
+              <div className="relative my-5 flex items-center justify-center">
+                <Separator className="bg-border/70" />
+                <span className="absolute bg-card px-3 font-mono-data text-[0.65rem] uppercase tracking-wider text-muted-foreground">
+                  or use credentials
+                </span>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Email address
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="auditor@s7.com"
+                      className="h-11 pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="h-11 pl-10 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-0 top-0 flex h-11 w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <Alert
+                    variant="destructive"
+                    className="border-destructive/30 bg-destructive/10 px-3 py-2.5"
+                  >
+                    <AlertDescription className="flex items-center gap-2 text-xs text-destructive">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{error}</span>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <Button type="submit" disabled={submitting} size="lg" className="mt-2 w-full">
+                  {submitting ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/70 border-t-transparent" />
+                      Establishing session...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Enter workspace
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
+                  )}
+                </Button>
+              </form>
+
+              <p className="mt-6 flex items-center justify-center gap-2 font-mono-data text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="h-1 w-1 rounded-full bg-success" />
+                end-to-end encrypted session
+              </p>
+            </CardContent>
+          </Card>
+
+          <p className="mt-5 text-center text-[0.7rem] text-muted-foreground lg:hidden">
+            S7 · Smart Infrastructure Audit Console
+          </p>
+        </motion.div>
+      </div>
     </div>
   );
 };

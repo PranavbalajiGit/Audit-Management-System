@@ -1,8 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auditService } from '../../services/api';
+import { motion } from 'framer-motion';
+import {
+  ClipboardList,
+  History,
+  RefreshCw,
+  Play,
+  Plus,
+  MapPin,
+  Building2,
+  CalendarClock,
+  Compass,
+} from 'lucide-react';
+import { toast } from 'sonner';
 
-const Dashboard = () => {
+import { auditService } from '../../services/api';
+import { StatCard } from '@/components/StatCard';
+import { StatusBadge, ConfidenceMeter } from '@/components/StatusBadge';
+import { LoadingScreen } from '@/components/LoadingScreen';
+import { EmptyState } from '@/components/EmptyState';
+import { BlurFade } from '@/components/fx/blur-fade';
+import { SpotlightCard } from '@/components/fx/spotlight-card';
+import { BorderBeam } from '@/components/fx/border-beam';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+
+const AuditorDashboard = () => {
   const [assignments, setAssignments] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,16 +47,14 @@ const Dashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch all assignments for current auditor
       const res = await auditService.getAssignments();
       const list = res.data || [];
-      
-      // Split into active and history
-      const activeTasks = list.filter(item => ['Assigned', 'In Progress'].includes(item.status));
-      const finishedTasks = list.filter(item => ['Submitted', 'Approved', 'Review Required', 'Rejected'].includes(item.status));
-      
-      setAssignments(activeTasks);
-      setHistory(finishedTasks);
+      setAssignments(list.filter((item) => ['Assigned', 'In Progress'].includes(item.status)));
+      setHistory(
+        list.filter((item) =>
+          ['Submitted', 'Approved', 'Review Required', 'Rejected'].includes(item.status)
+        )
+      );
     } catch (err) {
       setError('Failed to fetch assignments. Please try again.');
       console.error(err);
@@ -37,200 +66,194 @@ const Dashboard = () => {
   const handleStartResume = async (task) => {
     try {
       if (task.auditId) {
-        // Resume audit
         navigate(`/auditor/audits/${task.auditId._id || task.auditId}`);
       } else {
-        // Start audit
         const audit = await auditService.startAudit(task._id);
         navigate(`/auditor/audits/${audit._id}`);
       }
     } catch (err) {
-      alert(err.message || 'Failed to start audit session.');
+      toast.error(err.message || 'Failed to start audit session.');
     }
   };
 
+  const avgConfidence = history.length
+    ? Math.round(
+        history.reduce((sum, t) => sum + (t.auditId?.confidenceScore || 0), 0) / history.length
+      )
+    : 0;
+
+  if (loading) return <LoadingScreen label="Loading assigned inspections..." />;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold font-outfit text-white">Auditor Dashboard</h2>
-          <p className="text-slate-400 text-sm">Select an assigned location to perform QR and location verification.</p>
+      <BlurFade>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="font-mono-data text-[0.65rem] uppercase tracking-[0.24em] text-success/90">
+              Field workspace
+            </p>
+            <h2 className="mt-1 font-display text-2xl font-bold text-foreground">
+              Inspection queue
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Select an assigned location to run QR, GPS and capture verification.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchData}>
+            <RefreshCw className="h-4 w-4" /> Refresh tasks
+          </Button>
         </div>
-        <button
-          onClick={fetchData}
-          className="self-start sm:self-center flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white transition duration-200"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3" />
-          </svg>
-          Refresh Tasks
-        </button>
-      </div>
+      </BlurFade>
 
       {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      {loading ? (
-        <div className="flex h-64 items-center justify-center text-slate-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-3 border-emerald-500 border-t-transparent"></div>
-          <span className="ml-3 text-sm">Loading assigned inspections...</span>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {/* Active Tasks */}
-          <section className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-              Active Inspections ({assignments.length})
-            </h3>
-            
-            {assignments.length === 0 ? (
-              <div className="glass rounded-xl p-8 text-center text-slate-500 border-dashed">
-                <svg className="mx-auto h-12 w-12 text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <p className="text-sm">No active audit tasks assigned.</p>
-                <p className="text-xs text-slate-600 mt-1">Please contact your administrator if you believe this is an error.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {assignments.map((task) => (
-                  <div key={task._id} className="glass glass-hover rounded-xl p-5 flex flex-col justify-between border-slate-800/40">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${
-                          task.status === 'In Progress' 
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                        }`}>
-                          {task.status}
+      <div className="grid grid-cols-3 gap-4">
+        <StatCard label="Active" value={assignments.length} icon={ClipboardList} tone="primary" delay={0.05} />
+        <StatCard label="Completed" value={history.length} icon={History} tone="success" delay={0.12} />
+        <StatCard label="Avg score" value={avgConfidence} suffix="%" icon={Compass} tone="accent" delay={0.19} />
+      </div>
+
+      {/* Active inspections */}
+      <section className="space-y-4">
+        <h3 className="flex items-center gap-2 font-display text-base font-semibold text-foreground">
+          <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+          Active inspections ({assignments.length})
+        </h3>
+
+        {assignments.length === 0 ? (
+          <EmptyState
+            icon={ClipboardList}
+            title="No active audit tasks"
+            description="When an administrator assigns inspections to you, they'll appear here."
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {assignments.map((task, i) => {
+              const inProgress = task.status === 'In Progress';
+              return (
+                <BlurFade key={task._id} delay={i * 0.06}>
+                  <SpotlightCard className="reg-marks relative h-full rounded-xl border border-border/70 bg-card/70 p-5 shadow-panel transition-colors hover:border-success/40">
+                    {inProgress && <BorderBeam duration={9} />}
+                    <div className="flex items-start justify-between gap-3">
+                      <StatusBadge status={task.status} />
+                      <span className="flex items-center gap-1 font-mono-data text-[0.65rem] text-muted-foreground">
+                        <CalendarClock className="h-3 w-3" />
+                        {new Date(task.dueDate).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="mt-4">
+                      <h4 className="font-display text-xl font-bold leading-tight text-foreground">
+                        Room {task.roomId?.roomNumber || 'N/A'}
+                      </h4>
+                      <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-primary">
+                        <Building2 className="h-3.5 w-3.5" />
+                        {task.roomId?.buildingId?.name || 'Building'}
+                        <span className="text-muted-foreground">
+                          ({task.roomId?.buildingId?.code || 'BLDG'})
                         </span>
-                        <span className="text-xs text-slate-500 font-medium">
-                          Due: {new Date(task.dueDate).toLocaleDateString()}
-                        </span>
-                      </div>
-                      
+                      </p>
+                    </div>
+
+                    <div className="my-4 grid grid-cols-2 gap-3 border-y border-border/50 py-3 text-xs">
                       <div>
-                        <h4 className="text-lg font-bold text-white font-outfit leading-tight">
-                          Room {task.roomId?.roomNumber || 'N/A'}
-                        </h4>
-                        <p className="text-xs text-indigo-400 font-medium mt-0.5">
-                          {task.roomId?.buildingId?.name || 'Building'} ({task.roomId?.buildingId?.code || 'BLDG'})
+                        <p className="text-muted-foreground">Room type</p>
+                        <p className="mt-0.5 font-semibold text-foreground">
+                          {task.roomId?.roomType || 'Other'}
                         </p>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-xs border-y border-slate-800/30 py-2.5 my-1">
-                        <div>
-                          <p className="text-slate-500">Room Type</p>
-                          <p className="font-semibold text-slate-300 mt-0.5">{task.roomId?.roomType || 'Other'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-500">Checklist Template</p>
-                          <p className="font-semibold text-slate-300 mt-0.5 truncate">{task.checklistId?.title || 'Standard'}</p>
-                        </div>
+                      <div>
+                        <p className="text-muted-foreground">Checklist</p>
+                        <p className="mt-0.5 truncate font-semibold text-foreground">
+                          {task.checklistId?.title || 'Standard'}
+                        </p>
                       </div>
                     </div>
 
-                    <button
+                    <Button
                       onClick={() => handleStartResume(task)}
-                      className={`mt-4 w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold text-white shadow-md transition duration-200 ${
-                        task.status === 'In Progress'
-                          ? 'bg-amber-600 hover:bg-amber-500 hover:shadow-amber-600/10'
-                          : 'bg-indigo-600 hover:bg-indigo-500 hover:shadow-indigo-600/10'
-                      }`}
+                      variant={inProgress ? 'beacon' : 'default'}
+                      className="w-full"
                     >
-                      {task.status === 'In Progress' ? (
-                        <>
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                          </svg>
-                          Resume Verification
-                        </>
+                      {inProgress ? <Play className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                      {inProgress ? 'Resume verification' : 'Start inspection'}
+                    </Button>
+                  </SpotlightCard>
+                </BlurFade>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* History */}
+      <section className="space-y-4">
+        <h3 className="flex items-center gap-2 font-display text-base font-semibold text-foreground">
+          <span className="h-2 w-2 rounded-full bg-muted-foreground" />
+          Audit history ({history.length})
+        </h3>
+
+        {history.length === 0 ? (
+          <EmptyState
+            icon={History}
+            title="No completed audits"
+            description="Finished inspections and their authenticity scores show up here."
+          />
+        ) : (
+          <div className="reg-marks overflow-hidden rounded-xl border border-border/70 bg-card/70 shadow-panel">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Location</TableHead>
+                  <TableHead className="hidden sm:table-cell">Completed</TableHead>
+                  <TableHead className="w-[150px]">Confidence</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((task, i) => (
+                  <motion.tr
+                    key={task._id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: i * 0.04 }}
+                    className="border-b border-border/60 transition-colors hover:bg-secondary/30"
+                  >
+                    <TableCell>
+                      <p className="flex items-center gap-1.5 font-semibold text-foreground">
+                        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                        Room {task.roomId?.roomNumber || 'N/A'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {task.roomId?.buildingId?.name || 'Building'}
+                      </p>
+                    </TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
+                      {new Date(task.updatedAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="w-[150px]">
+                      {task.auditId?.confidenceScore !== undefined ? (
+                        <ConfidenceMeter score={task.auditId.confidenceScore} showLabel={false} />
                       ) : (
-                        <>
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                          </svg>
-                          Start Inspection
-                        </>
+                        <span className="text-xs text-muted-foreground">N/A</span>
                       )}
-                    </button>
-                  </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <StatusBadge status={task.status} />
+                    </TableCell>
+                  </motion.tr>
                 ))}
-              </div>
-            )}
-          </section>
-
-          {/* Audit History */}
-          <section className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-slate-500"></span>
-              Audit History ({history.length})
-            </h3>
-
-            {history.length === 0 ? (
-              <div className="glass rounded-xl p-6 text-center text-slate-500">
-                <p className="text-sm">No completed audits in your history yet.</p>
-              </div>
-            ) : (
-              <div className="glass rounded-xl overflow-hidden border-slate-800/40">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-300">
-                    <thead className="bg-slate-900/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/40">
-                      <tr>
-                        <th className="px-5 py-3">Location</th>
-                        <th className="px-5 py-3">Date Completed</th>
-                        <th className="px-5 py-3">Confidence Score</th>
-                        <th className="px-5 py-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/30">
-                      {history.map((task) => (
-                        <tr key={task._id} className="hover:bg-slate-900/20 transition-all">
-                          <td className="px-5 py-3.5">
-                            <p className="font-semibold text-white">Room {task.roomId?.roomNumber || 'N/A'}</p>
-                            <p className="text-xs text-slate-400">{task.roomId?.buildingId?.name || 'Building'}</p>
-                          </td>
-                          <td className="px-5 py-3.5 text-slate-400">
-                            {new Date(task.updatedAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            {task.auditId?.confidenceScore !== undefined ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className={`h-2 w-2 rounded-full ${
-                                  task.auditId.confidenceScore >= 90 ? 'bg-emerald-500' : task.auditId.confidenceScore >= 70 ? 'bg-amber-500' : 'bg-red-500'
-                                }`}></span>
-                                <span className="font-bold text-slate-200">{task.auditId.confidenceScore}%</span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-500">N/A</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                              task.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                              task.status === 'Review Required' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                              task.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                              'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                            }`}>
-                              {task.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
-      )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </section>
     </div>
   );
 };
 
-export default Dashboard;
+export default AuditorDashboard;

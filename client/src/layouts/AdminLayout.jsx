@@ -1,108 +1,281 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  LayoutDashboard,
+  Users,
+  Building2,
+  DoorOpen,
+  ListChecks,
+  CalendarClock,
+  FileBarChart,
+  PanelLeftClose,
+  PanelLeftOpen,
+  LogOut,
+  Search,
+  ShieldCheck,
+  Command as CommandIcon,
+} from 'lucide-react';
+
 import { useAuth } from '../context/AuthContext';
+import { cn } from '@/lib/utils';
+import { CommandPalette } from '@/components/CommandPalette';
+import PageTransition from '@/components/PageTransition';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  Avatar,
+  AvatarFallback,
+} from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+const menuItems = [
+  { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, hint: 'Overview' },
+  { name: 'Users', path: '/admin/users', icon: Users, hint: 'People' },
+  { name: 'Buildings', path: '/admin/buildings', icon: Building2, hint: 'Registry' },
+  { name: 'Rooms', path: '/admin/rooms', icon: DoorOpen, hint: 'Registry' },
+  { name: 'Checklists', path: '/admin/checklists', icon: ListChecks, hint: 'Templates' },
+  { name: 'Assignments', path: '/admin/assignments', icon: CalendarClock, hint: 'Dispatch' },
+  { name: 'Reports', path: '/admin/reports', icon: FileBarChart, hint: 'Review' },
+];
+
+const ease = [0.16, 1, 0.3, 1];
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [clock, setClock] = useState(() => new Date());
 
-  const menuItems = [
-    { name: 'Dashboard', path: '/admin', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z' },
-    { name: 'Users', path: '/admin/users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-    { name: 'Buildings', path: '/admin/buildings', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-    { name: 'Rooms', path: '/admin/rooms', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-    { name: 'Checklists', path: '/admin/checklists', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-    { name: 'Assignments', path: '/admin/assignments', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-    { name: 'Reports', path: '/admin/reports', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-  ];
+  useEffect(() => {
+    const t = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const activeItem = menuItems.find((item) => item.path === location.pathname);
+
+  const commandItems = menuItems.map((item) => ({
+    name: item.name,
+    path: item.path,
+    icon: item.icon,
+    hint: item.hint,
+  }));
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100 antialiased font-inter">
-      {/* Sidebar Panel */}
-      <aside className={`glass shrink-0 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} flex flex-col border-r border-slate-800/40 z-20`}>
-        <div className="flex h-16 items-center justify-between px-4 border-b border-slate-800/40">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-400 ring-1 ring-indigo-500/20">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            {sidebarOpen && (
-              <span className="font-outfit font-bold text-lg text-white select-none whitespace-nowrap">
-                Audit Admin
-              </span>
-            )}
+    <div className="relative flex min-h-screen bg-background text-foreground antialiased">
+      {/* Ambient blueprint backdrop */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
+        <div className="absolute inset-0 blueprint-grid opacity-60" />
+        <div className="absolute -left-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-radial-signal blur-3xl" />
+        <div className="absolute -bottom-52 right-0 h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle_at_center,hsl(var(--accent)/0.09)_0%,transparent_70%)] blur-3xl" />
+      </div>
+
+      {/* Rail */}
+      <motion.aside
+        animate={{ width: sidebarOpen ? 256 : 76 }}
+        transition={{ duration: 0.35, ease }}
+        className="relative z-20 flex shrink-0 flex-col border-r border-border/60 bg-card/70 backdrop-blur-xl"
+      >
+        <div className="flex h-16 items-center gap-3 border-b border-border/60 px-4">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/25">
+            <span className="absolute inset-0 rounded-xl bg-primary/20 animate-pulse-ring" />
+            <ShieldCheck className="relative h-5 w-5" strokeWidth={2.2} />
           </div>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-900/50 hover:text-white"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? 'M11 19l-7-7 7-7m8 14l-7-7 7-7' : 'M13 5l7 7-7 7M5 5l7 7-7 7'} />
-            </svg>
-          </button>
+          <AnimatePresence>
+            {sidebarOpen && (
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.2 }}
+                className="min-w-0"
+              >
+                <p className="font-display text-base font-bold leading-none text-foreground">
+                  S7 Console
+                </p>
+                <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.22em] text-primary/80">
+                  admin
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <nav className="flex-1 space-y-1.5 p-3 overflow-y-auto">
+        <nav className="flex-1 space-y-1 p-3">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const Icon = item.icon;
             return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition duration-200 ${
-                  isActive
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                    : 'text-slate-400 hover:bg-slate-900/50 hover:text-white'
-                }`}
-              >
-                <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-                </svg>
-                {sidebarOpen && <span>{item.name}</span>}
-              </Link>
+              <Tooltip key={item.path}>
+                <TooltipTrigger asChild>
+                  <Link
+                    to={item.path}
+                    className={cn(
+                      'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                      isActive ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                      !sidebarOpen && 'justify-center'
+                    )}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="admin-active-item"
+                        className="absolute inset-0 rounded-lg bg-primary shadow-[0_10px_30px_-14px_hsl(var(--primary)/0.9)]"
+                        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                      />
+                    )}
+                    <Icon className="relative h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+                    <AnimatePresence>
+                      {sidebarOpen && (
+                        <motion.span
+                          initial={{ opacity: 0, x: -6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -6 }}
+                          transition={{ duration: 0.18 }}
+                          className="relative whitespace-nowrap"
+                        >
+                          {item.name}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </Link>
+                </TooltipTrigger>
+                {!sidebarOpen && <TooltipContent side="right">{item.name}</TooltipContent>}
+              </Tooltip>
             );
           })}
         </nav>
 
-        <div className="p-3 border-t border-slate-800/40">
+        <div className="border-t border-border/60 p-3">
           <button
             onClick={logout}
-            className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition duration-200"
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive/90 transition-colors hover:bg-destructive/10',
+              !sidebarOpen && 'justify-center'
+            )}
           >
-            <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            {sidebarOpen && <span>Log Out</span>}
+            <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+            {sidebarOpen && <span>Log out</span>}
           </button>
         </div>
-      </aside>
+      </motion.aside>
 
-      {/* Main Body */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="glass h-16 flex items-center justify-between px-6 border-b border-slate-800/40 z-10 shrink-0">
-          <h1 className="font-outfit font-bold text-xl text-white">
-            {menuItems.find(item => item.path === location.pathname)?.name || 'Admin Console'}
-          </h1>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white shadow-md shadow-indigo-600/20">
-                {user?.name?.charAt(0) || 'A'}
-              </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-sm font-semibold text-white leading-tight">{user?.name || 'Admin User'}</p>
-                <p className="text-xs text-indigo-400 leading-none">{user?.role || 'Administrator'}</p>
-              </div>
+      {/* Body */}
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              aria-label="Toggle sidebar"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </button>
+            <div className="min-w-0">
+              <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.22em] text-muted-foreground">
+                S7 / Admin
+              </p>
+              <h1 className="truncate font-display text-lg font-bold leading-tight text-foreground">
+                {activeItem?.name || 'Console'}
+              </h1>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="hidden items-center gap-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground md:flex"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span>Search</span>
+              <kbd className="ml-2 flex items-center gap-0.5 rounded border border-border bg-background/60 px-1.5 py-0.5 font-mono-data text-[0.6rem]">
+                <CommandIcon className="h-2.5 w-2.5" />K
+              </kbd>
+            </button>
+
+            <div className="hidden items-center gap-2 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2 lg:flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+              <span className="font-mono-data text-xs text-muted-foreground">
+                {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-full border border-border/60 p-0.5 pr-2 transition-colors hover:border-primary/40">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="text-xs">
+                      {user?.name?.charAt(0) || 'A'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden text-left sm:block">
+                    <p className="text-xs font-semibold leading-tight text-foreground">
+                      {user?.name || 'Admin User'}
+                    </p>
+                    <p className="font-mono-data text-[0.6rem] uppercase tracking-wider text-primary/80">
+                      {user?.role || 'Administrator'}
+                    </p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Signed in</DropdownMenuLabel>
+                <div className="px-2 pb-2">
+                  <p className="truncate text-sm font-medium text-foreground">{user?.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setPaletteOpen(true)}>
+                  <Search className="h-4 w-4" /> Search console
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={logout}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <LogOut className="h-4 w-4" /> Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-6">
-          <Outlet />
+        <main className="flex-1 overflow-x-hidden p-4 sm:p-6">
+          <AnimatePresence mode="wait">
+            <PageTransition key={location.pathname} className="mx-auto max-w-[1400px]">
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
         </main>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        items={commandItems}
+      />
     </div>
   );
 };
