@@ -356,7 +356,7 @@ const Rooms = () => {
                       <ShieldCheck className="h-4 w-4" />
                     </span>
                     <div className="text-left leading-tight">
-                      <p className="font-display text-sm font-bold">S7 Audit</p>
+                      <p className="font-display text-sm font-bold">Audit Console</p>
                       <p className="font-mono-data text-[0.55rem] uppercase tracking-[0.22em] text-white/60">
                         Inspection tag
                       </p>
@@ -392,7 +392,7 @@ const Rooms = () => {
 
                   <div className="mt-6 border-t border-dashed border-slate-300 pt-3">
                     <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.2em] text-slate-400">
-                      Scan with the S7 app to begin inspection
+                      Scan with the Audit Console app to begin inspection
                     </p>
                   </div>
                 </div>

@@ -115,7 +115,7 @@ const AdminLayout = () => {
                 className="min-w-0"
               >
                 <p className="font-display text-base font-bold leading-none text-foreground">
-                  S7 Console
+                  Audit Console
                 </p>
                 <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.22em] text-primary/80">
                   admin
@@ -196,7 +196,7 @@ const AdminLayout = () => {
             </button>
             <div className="min-w-0">
               <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.22em] text-muted-foreground">
-                S7 / Admin
+                Audit Console
               </p>
               <h1 className="truncate font-display text-lg font-bold leading-tight text-foreground">
                 {activeItem?.name || 'Console'}

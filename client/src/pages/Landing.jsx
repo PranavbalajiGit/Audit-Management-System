@@ -166,7 +166,7 @@ const Landing = () => {
               <ShieldCheck className="relative h-5 w-5" strokeWidth={2.2} />
             </div>
             <div className="leading-none">
-              <p className="font-display text-base font-bold">S7 Audit Console</p>
+              <p className="font-display text-base font-bold">Audit Console</p>
               <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.22em] text-muted-foreground">
                 smart infrastructure audit
               </p>
@@ -225,7 +225,7 @@ const Landing = () => {
           </h1>
 
           <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground">
-            S7 turns room-by-room inspections into verifiable records. QR tags, live GPS and
+            Audit Console turns room-by-room inspections into verifiable records. QR tags, live GPS and
             camera-only captures stop the shortcuts, while an AI authenticity score tells admins
             exactly which submissions to trust.
           </p>
@@ -473,7 +473,7 @@ const Landing = () => {
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row lg:px-8">
           <div className="flex items-center gap-2.5">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <span className="font-display text-sm font-semibold">S7 Audit Console</span>
+            <span className="font-display text-sm font-semibold">Audit Console</span>
           </div>
           <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">
             smart infrastructure audit · verified records

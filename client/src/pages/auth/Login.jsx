@@ -195,7 +195,7 @@ const Login = () => {
                 </div>
                 <div>
                   <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
-                    S7 Audit Console
+                    Audit Console
                   </h2>
                   <p className="text-sm text-muted-foreground">Sign in to your workspace</p>
                 </div>
@@ -317,7 +317,7 @@ const Login = () => {
           </Card>
 
           <p className="mt-5 text-center text-[0.7rem] text-muted-foreground lg:hidden">
-            S7 · Smart Infrastructure Audit Console
+            Smart Infrastructure Audit Console
           </p>
         </motion.div>
       </div>
