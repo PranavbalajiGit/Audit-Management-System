@@ -1,13 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { analyticsService, auditService } from '../../services/api';
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+import {
+  DoorOpen,
+  ShieldCheck,
+  Clock3,
+  Gauge,
+  RefreshCw,
+  Map as MapIcon,
+  TrendingUp,
+  Activity,
+} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as ReTooltip,
+  ResponsiveContainer,
+  Area,
+  AreaChart,
+} from 'recharts';
 
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+import { analyticsService, auditService } from '../../services/api';
+import { StatCard } from '@/components/StatCard';
+import { StatusBadge, ConfidenceMeter } from '@/components/StatusBadge';
+import { LoadingScreen } from '@/components/LoadingScreen';
+import { EmptyState } from '@/components/EmptyState';
+import { BlurFade } from '@/components/fx/blur-fade';
+import { SpotlightCard } from '@/components/fx/spotlight-card';
+import { Marquee } from '@/components/fx/marquee';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -16,9 +53,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Custom markers for different audit statuses on the map
 const getMarkerIcon = (status) => {
-  let color = 'indigo';
+  let color = 'blue';
   if (status === 'Approved') color = 'green';
   else if (status === 'Review Required') color = 'orange';
   else if (status === 'Rejected') color = 'red';
@@ -30,29 +66,32 @@ const getMarkerIcon = (status) => {
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+    shadowSize: [41, 41],
   });
 };
 
-const Dashboard = () => {
+const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [trends, setTrends] = useState([]);
   const [recentAudits, setRecentAudits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError('');
     try {
-      const statsData = await analyticsService.getDashboardStats();
-      const trendsData = await analyticsService.getTrends();
-      const auditsData = await auditService.getAudits({ limit: 5 });
-
+      const [statsData, trendsData, auditsData] = await Promise.all([
+        analyticsService.getDashboardStats(),
+        analyticsService.getTrends(),
+        auditService.getAudits({ limit: 6 }),
+      ]);
       setStats(statsData);
       setTrends(trendsData);
       setRecentAudits(auditsData.data || []);
@@ -61,202 +100,306 @@ const Dashboard = () => {
       console.error(err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-96 items-center justify-center text-slate-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent"></div>
-        <span className="ml-3 text-sm">Aggregating dashboard analytics...</span>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen label="Aggregating audit telemetry..." />;
 
   if (error) {
     return (
-      <div className="glass rounded-xl p-6 text-center max-w-md mx-auto border-red-500/20 text-red-400">
-        <p className="text-sm font-semibold">{error}</p>
-        <button onClick={fetchDashboardData} className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold rounded-lg text-white">
-          Retry Connection
-        </button>
+      <div className="reg-marks mx-auto max-w-md rounded-xl border border-destructive/25 bg-destructive/5 p-8 text-center">
+        <p className="font-display text-sm font-semibold text-destructive">{error}</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => fetchDashboardData()}>
+          <RefreshCw className="h-4 w-4" /> Retry connection
+        </Button>
       </div>
     );
   }
 
-  // Calculate default map center based on recent audits or a standard center
-  const mapCenter = recentAudits.length > 0 && recentAudits[0].roomId?.latitude
-    ? [recentAudits[0].roomId.latitude, recentAudits[0].roomId.longitude]
-    : [11.0168, 76.9558]; // Standard institutional latitude/longitude default
+  const audited =
+    stats.statusCounts.Approved +
+      stats.statusCounts.ReviewRequired +
+      stats.statusCounts.Rejected || 0;
+
+  const mapCenter =
+    recentAudits.length > 0 && recentAudits[0].roomId?.latitude
+      ? [recentAudits[0].roomId.latitude, recentAudits[0].roomId.longitude]
+      : [11.0168, 76.9558];
+
+  const coverage = stats.roomsCount ? Math.round((audited / stats.roomsCount) * 100) : 0;
 
   return (
     <div className="space-y-6">
-      {/* Metric Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass rounded-xl p-4 sm:p-5 flex flex-col justify-between border-slate-800/40 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 h-16 w-16 bg-indigo-500/5 rounded-bl-full group-hover:scale-110 transition duration-300"></div>
-          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Rooms Audited</span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-white font-outfit mt-2">
-            {(stats.statusCounts.Approved + stats.statusCounts.ReviewRequired + stats.statusCounts.Rejected) || 0}
-            <span className="text-xs font-normal text-slate-500 ml-1">/ {stats.roomsCount}</span>
-          </span>
+      <BlurFade>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="font-mono-data text-[0.65rem] uppercase tracking-[0.24em] text-primary/80">
+              Operations overview
+            </p>
+            <h2 className="mt-1 font-display text-2xl font-bold text-foreground">
+              Compliance command center
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Live status of every inspection across mapped infrastructure.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing}
+          >
+            <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+            {refreshing ? 'Syncing' : 'Refresh'}
+          </Button>
         </div>
+      </BlurFade>
 
-        <div className="glass rounded-xl p-4 sm:p-5 flex flex-col justify-between border-slate-800/40 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 h-16 w-16 bg-emerald-500/5 rounded-bl-full group-hover:scale-110 transition duration-300"></div>
-          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Auto Approved</span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-outfit mt-2">
-            {stats.statusCounts.Approved}
-          </span>
+      {/* Ticker */}
+      <BlurFade delay={0.05}>
+        <div className="overflow-hidden rounded-lg border border-border/60 bg-card/40 py-2.5">
+          <Marquee duration={38} gap="2.5rem">
+            {[
+              `${stats.roomsCount} rooms mapped`,
+              `${stats.statusCounts.Approved} auto-approved`,
+              `${stats.statusCounts.ReviewRequired} awaiting review`,
+              `${coverage}% coverage`,
+              `${stats.averageConfidence}% average confidence`,
+              'QR + GPS verified',
+            ].map((t) => (
+              <span
+                key={t}
+                className="flex items-center gap-2 whitespace-nowrap font-mono-data text-xs uppercase tracking-wider text-muted-foreground"
+              >
+                <span className="h-1 w-1 rounded-full bg-accent" />
+                {t}
+              </span>
+            ))}
+          </Marquee>
         </div>
+      </BlurFade>
 
-        <div className="glass rounded-xl p-4 sm:p-5 flex flex-col justify-between border-slate-800/40 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 h-16 w-16 bg-amber-500/5 rounded-bl-full group-hover:scale-110 transition duration-300"></div>
-          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Review</span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-amber-400 font-outfit mt-2">
-            {stats.statusCounts.ReviewRequired}
-          </span>
-        </div>
-
-        <div className="glass rounded-xl p-4 sm:p-5 flex flex-col justify-between border-slate-800/40 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 h-16 w-16 bg-indigo-500/5 rounded-bl-full group-hover:scale-110 transition duration-300"></div>
-          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Confidence</span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-white font-outfit mt-2">
-            {stats.averageConfidence}%
-          </span>
-        </div>
+      {/* Metric cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Rooms audited"
+          value={audited}
+          suffix=""
+          hint={`of ${stats.roomsCount} mapped`}
+          icon={DoorOpen}
+          tone="primary"
+          delay={0.05}
+        />
+        <StatCard
+          label="Auto approved"
+          value={stats.statusCounts.Approved}
+          hint="score ≥ 90%"
+          icon={ShieldCheck}
+          tone="success"
+          delay={0.12}
+        />
+        <StatCard
+          label="Pending review"
+          value={stats.statusCounts.ReviewRequired}
+          hint="needs a human call"
+          icon={Clock3}
+          tone="warning"
+          delay={0.19}
+        />
+        <StatCard
+          label="Avg confidence"
+          value={stats.averageConfidence}
+          suffix="%"
+          hint="across submissions"
+          icon={Gauge}
+          tone="accent"
+          delay={0.26}
+        />
       </div>
 
-      {/* Campus Map & Chart Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Real-time Campus Leaflet Map */}
-        <div className="glass rounded-xl p-5 border-slate-800/40 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white font-outfit">Campus Inspection Map</h3>
-            <div className="flex gap-2.5 text-[9px] font-bold uppercase tracking-wider">
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Approved</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span> Review</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500"></span> Failed</span>
+      {/* Map + trends */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <BlurFade delay={0.1}>
+          <SpotlightCard className="reg-marks h-full rounded-xl border border-border/70 bg-card/70 p-5 shadow-panel">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 font-display text-base font-bold text-foreground">
+                <MapIcon className="h-4 w-4 text-primary" /> Campus inspection map
+              </h3>
+              <div className="flex gap-3 font-mono-data text-[0.6rem] uppercase tracking-wider text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-success" /> Approved
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-warning" /> Review
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-destructive" /> Failed
+                </span>
+              </div>
             </div>
-          </div>
-          
-          <div className="h-72 rounded-lg overflow-hidden border border-slate-800/40">
-            <MapContainer center={mapCenter} zoom={15} style={{ height: '100%', width: '100%' }}>
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              {recentAudits.map((audit) => {
-                if (!audit.roomId?.latitude) return null;
-                return (
-                  <Marker 
-                    key={audit._id} 
-                    position={[audit.roomId.latitude, audit.roomId.longitude]}
-                    icon={getMarkerIcon(audit.status)}
-                  >
-                    <Popup>
-                      <div className="text-slate-900 font-inter text-xs space-y-0.5">
-                        <p className="font-bold text-sm">Room {audit.roomId.roomNumber}</p>
-                        <p className="text-slate-600">{audit.roomId.buildingId?.name}</p>
-                        <p className="text-slate-500 font-medium">Auditor: {audit.auditorId?.name}</p>
-                        <p className="pt-1"><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold text-white ${
-                          audit.status === 'Approved' ? 'bg-emerald-600' :
-                          audit.status === 'Review Required' ? 'bg-amber-600' : 'bg-red-600'
-                        }`}>{audit.status}</span></p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                );
-              })}
-            </MapContainer>
-          </div>
-        </div>
+            <div className="h-72 overflow-hidden rounded-lg border border-border/60">
+              <MapContainer center={mapCenter} zoom={15} style={{ height: '100%', width: '100%' }}>
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                {recentAudits.map((audit) => {
+                  if (!audit.roomId?.latitude) return null;
+                  return (
+                    <Marker
+                      key={audit._id}
+                      position={[audit.roomId.latitude, audit.roomId.longitude]}
+                      icon={getMarkerIcon(audit.status)}
+                    >
+                      <Popup>
+                        <div className="space-y-1 font-sans text-xs">
+                          <p className="font-display text-sm font-bold">
+                            Room {audit.roomId.roomNumber}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {audit.roomId.buildingId?.name}
+                          </p>
+                          <p className="text-muted-foreground">
+                            Auditor: {audit.auditorId?.name}
+                          </p>
+                          <p className="pt-0.5 font-semibold">{audit.status}</p>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </MapContainer>
+            </div>
+          </SpotlightCard>
+        </BlurFade>
 
-        {/* Audit Completion Trends Line Chart */}
-        <div className="glass rounded-xl p-5 border-slate-800/40 space-y-4">
-          <h3 className="text-base font-bold text-white font-outfit">Audit Completion Trends</h3>
-          <div className="h-72 w-full pr-4">
-            {trends.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-slate-600 text-xs italic">No trend data available for the last 7 days</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trends}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.3} />
-                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} allowDecimals={false} />
-                  <Tooltip 
-                    contentStyle={{ background: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                    labelClassName="font-bold"
-                  />
-                  <Line type="monotone" dataKey="count" name="Inspections Completed" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#4f46e5', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
+        <BlurFade delay={0.16}>
+          <SpotlightCard className="reg-marks h-full rounded-xl border border-border/70 bg-card/70 p-5 shadow-panel">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 font-display text-base font-bold text-foreground">
+                <TrendingUp className="h-4 w-4 text-primary" /> Completion trends
+              </h3>
+              <span className="font-mono-data text-[0.6rem] uppercase tracking-wider text-muted-foreground">
+                last 7 days
+              </span>
+            </div>
+            <div className="h-72 w-full pr-2">
+              {trends.length === 0 ? (
+                <EmptyState
+                  icon={Activity}
+                  title="No trend data yet"
+                  description="Inspections completed in the last 7 days will appear here."
+                  className="h-full border-0 bg-transparent"
+                />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trends} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#2E90FA" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#2E90FA" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1c2a3d" opacity={0.5} vertical={false} />
+                    <XAxis dataKey="date" stroke="#8da0b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#8da0b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <ReTooltip
+                      contentStyle={{
+                        background: 'hsl(217 46% 9%)',
+                        borderColor: 'hsl(213 34% 20%)',
+                        borderRadius: '10px',
+                        color: '#e6edf6',
+                        fontSize: '12px',
+                      }}
+                      labelClassName="font-semibold"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      name="Inspections"
+                      stroke="#2E90FA"
+                      strokeWidth={2.5}
+                      fill="url(#trendFill)"
+                      dot={{ fill: '#2E90FA', r: 3, strokeWidth: 0 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </SpotlightCard>
+        </BlurFade>
       </div>
 
-      {/* Recent Audit Submissions Table */}
-      <section className="glass rounded-xl border border-slate-800/40 overflow-hidden">
-        <div className="flex h-12 items-center justify-between px-5 border-b border-slate-800/40 bg-slate-900/40">
-          <h3 className="text-sm font-bold text-white font-outfit">Recent Inspection Requests</h3>
-          <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Latest updates</span>
-        </div>
-        
-        {recentAudits.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">
-            No audits submitted in the system yet.
+      {/* Recent submissions */}
+      <BlurFade delay={0.12}>
+        <section className="reg-marks overflow-hidden rounded-xl border border-border/70 bg-card/70 shadow-panel">
+          <div className="flex h-14 items-center justify-between border-b border-border/60 px-5">
+            <h3 className="flex items-center gap-2 font-display text-sm font-bold text-foreground">
+              <Activity className="h-4 w-4 text-primary" /> Recent inspection requests
+            </h3>
+            <span className="font-mono-data text-[0.6rem] uppercase tracking-wider text-muted-foreground">
+              live feed
+            </span>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-900/20 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/30">
-                <tr>
-                  <th className="px-5 py-3">Location</th>
-                  <th className="px-5 py-3">Auditor</th>
-                  <th className="px-5 py-3">Date Submitted</th>
-                  <th className="px-5 py-3">Confidence Score</th>
-                  <th className="px-5 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/30">
-                {recentAudits.map((audit) => (
-                  <tr key={audit._id} className="hover:bg-slate-900/10 transition">
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-white">Room {audit.roomId?.roomNumber}</p>
-                      <p className="text-xs text-slate-400">{audit.roomId?.buildingId?.name}</p>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-slate-200">{audit.auditorId?.name}</p>
-                      <p className="text-xs text-slate-500">{audit.auditorId?.email}</p>
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-400">
-                      {audit.submittedAt ? new Date(audit.submittedAt).toLocaleDateString() : 'In Progress'}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full ${
-                          audit.confidenceScore >= 90 ? 'bg-emerald-500' : audit.confidenceScore >= 70 ? 'bg-amber-500' : 'bg-red-500'
-                        }`}></span>
-                        <span className="font-bold text-slate-200">{audit.confidenceScore}%</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                        audit.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                        audit.status === 'Review Required' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                        audit.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                        'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                      }`}>
-                        {audit.status}
-                      </span>
-                    </td>
-                  </tr>
+
+          {recentAudits.length === 0 ? (
+            <EmptyState
+              icon={DoorOpen}
+              title="No audits submitted yet"
+              description="Once auditors submit inspections, they'll surface here."
+              className="border-0 bg-transparent"
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Location</TableHead>
+                  <TableHead>Auditor</TableHead>
+                  <TableHead className="hidden md:table-cell">Submitted</TableHead>
+                  <TableHead className="w-[160px]">Confidence</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentAudits.map((audit, i) => (
+                  <motion.tr
+                    key={audit._id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: i * 0.04 }}
+                    className="border-b border-border/60 transition-colors hover:bg-secondary/30"
+                  >
+                    <TableCell>
+                      <p className="font-semibold text-foreground">
+                        Room {audit.roomId?.roomNumber}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {audit.roomId?.buildingId?.name}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <p className="font-medium text-foreground">{audit.auditorId?.name}</p>
+                      <p className="text-xs text-muted-foreground">{audit.auditorId?.email}</p>
+                    </TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+                      {audit.submittedAt
+                        ? new Date(audit.submittedAt).toLocaleDateString()
+                        : 'In progress'}
+                    </TableCell>
+                    <TableCell className="w-[160px]">
+                      <ConfidenceMeter score={audit.confidenceScore} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <StatusBadge status={audit.status} />
+                    </TableCell>
+                  </motion.tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+              </TableBody>
+            </Table>
+          )}
+        </section>
+      </BlurFade>
     </div>
   );
 };
 
-export default Dashboard;
+export default AdminDashboard;

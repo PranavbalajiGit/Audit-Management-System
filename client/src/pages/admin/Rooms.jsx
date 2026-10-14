@@ -1,28 +1,62 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { DoorOpen, Plus, Pencil, Trash2, QrCode, MapPin, Printer, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { roomService, buildingService } from '../../services/api';
+import { AppModal, Field } from '@/components/AppModal';
+import { LoadingScreen } from '@/components/LoadingScreen';
+import { EmptyState } from '@/components/EmptyState';
+import { BlurFade } from '@/components/fx/blur-fade';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
+const ROOM_TYPES = ['Classroom', 'Laboratory', 'Hostel', 'Library', 'Office', 'Other'];
+
+const emptyRoom = {
+  buildingId: '',
+  roomNumber: '',
+  roomType: 'Classroom',
+  latitude: '11.0168',
+  longitude: '76.9558',
+  referenceImages: [],
+};
 
 const Rooms = () => {
   const [rooms, setRooms] = useState([]);
   const [buildings, setBuildings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
-  // Modal states
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
-  
-  // QR View Modal
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [activeQr, setActiveQr] = useState(null);
+  const [formData, setFormData] = useState(emptyRoom);
 
-  const [formData, setFormData] = useState({
-    buildingId: '',
-    roomNumber: '',
-    roomType: 'Classroom',
-    latitude: '',
-    longitude: '',
-    referenceImages: []
-  });
+  const [qrOpen, setQrOpen] = useState(false);
+  const [activeQr, setActiveQr] = useState(null);
 
   useEffect(() => {
     fetchRooms();
@@ -52,14 +86,7 @@ const Rooms = () => {
 
   const handleOpenCreate = () => {
     setEditingRoom(null);
-    setFormData({
-      buildingId: buildings[0]?._id || '',
-      roomNumber: '',
-      roomType: 'Classroom',
-      latitude: '11.0168', // default coordinates
-      longitude: '76.9558',
-      referenceImages: []
-    });
+    setFormData({ ...emptyRoom, buildingId: buildings[0]?._id || '' });
     setModalOpen(true);
   };
 
@@ -71,18 +98,20 @@ const Rooms = () => {
       roomType: room.roomType || 'Classroom',
       latitude: room.latitude || '',
       longitude: room.longitude || '',
-      referenceImages: room.referenceImages || []
+      referenceImages: room.referenceImages || [],
     });
     setModalOpen(true);
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this room?')) return;
+    if (!confirm('Are you sure you want to delete this room? Its QR tag will be invalidated.'))
+      return;
     try {
       await roomService.deleteRoom(id);
+      toast.success('Room removed');
       fetchRooms();
     } catch (err) {
-      alert(err.message || 'Deletion failed.');
+      toast.error(err.message || 'Deletion failed.');
     }
   };
 
@@ -91,13 +120,15 @@ const Rooms = () => {
     try {
       if (editingRoom) {
         await roomService.updateRoom(editingRoom._id, formData);
+        toast.success('Room details updated');
       } else {
         await roomService.createRoom(formData);
+        toast.success('Room registered');
       }
       setModalOpen(false);
       fetchRooms();
     } catch (err) {
-      alert(err.message || 'Operation failed.');
+      toast.error(err.message || 'Operation failed.');
     }
   };
 
@@ -106,243 +137,283 @@ const Rooms = () => {
       setActiveQr({
         roomNumber: room.roomNumber,
         buildingName: room.buildingId?.name,
-        code: room.qrCodeId.encodedData
+        code: room.qrCodeId.encodedData,
       });
-      setQrModalOpen(true);
+      setQrOpen(true);
     } else {
-      alert('QR Code not generated yet. Try re-saving this room.');
+      toast.error('QR code not generated yet. Try re-saving this room.');
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold font-outfit text-white">Campus Rooms</h2>
-          <p className="text-xs text-slate-400">Manage rooms, registered GPS coordinates, and view QR tags.</p>
+      <BlurFade>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="font-mono-data text-[0.65rem] uppercase tracking-[0.24em] text-muted-foreground">
+              Registry · {rooms.length} spaces
+            </p>
+            <h2 className="mt-1 font-display text-2xl font-bold text-foreground">Campus rooms</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage rooms, registered GPS coordinates, and print QR tags.
+            </p>
+          </div>
+          <Button onClick={handleOpenCreate}>
+            <Plus className="h-4 w-4" /> Add room
+          </Button>
         </div>
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center gap-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-semibold text-white shadow-lg transition"
-        >
-          Add Room
-        </button>
-      </div>
+      </BlurFade>
 
       {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center text-slate-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent"></div>
-          <span className="ml-3 text-sm">Loading rooms registry...</span>
-        </div>
+        <LoadingScreen label="Loading rooms registry..." />
+      ) : rooms.length === 0 ? (
+        <EmptyState
+          icon={DoorOpen}
+          title="No rooms registered"
+          description="Add rooms under a building to generate QR tags for inspection."
+          action={
+            <Button size="sm" onClick={handleOpenCreate}>
+              <Plus className="h-4 w-4" /> Add room
+            </Button>
+          }
+        />
       ) : (
-        <div className="glass rounded-xl overflow-hidden border-slate-800/40">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-900/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800/40">
-                <tr>
-                  <th className="px-5 py-3">Room Number</th>
-                  <th className="px-5 py-3">Building</th>
-                  <th className="px-5 py-3">Type</th>
-                  <th className="px-5 py-3">Coordinates (Lat, Lon)</th>
-                  <th className="px-5 py-3 text-center">QR Tag</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/30">
-                {rooms.map((item) => (
-                  <tr key={item._id} className="hover:bg-slate-900/10 transition">
-                    <td className="px-5 py-3.5 font-semibold text-white">Room {item.roomNumber}</td>
-                    <td className="px-5 py-3.5 text-slate-400">
-                      {item.buildingId?.name} ({item.buildingId?.code})
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-semibold text-slate-300">
-                        {item.roomType}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-400 font-mono">
-                      {item.latitude.toFixed(6)}, {item.longitude.toFixed(6)}
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <button
-                        onClick={() => showQr(item)}
-                        className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded text-xs font-semibold"
-                      >
-                        View QR Code
-                      </button>
-                    </td>
-                    <td className="px-5 py-3.5 text-right space-x-2.5">
-                      <button
-                        onClick={() => handleOpenEdit(item)}
-                        className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item._id)}
-                        className="text-xs font-semibold text-red-400 hover:text-red-300 transition"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="reg-marks overflow-hidden rounded-xl border border-border/70 bg-card/70 shadow-panel">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Room</TableHead>
+                <TableHead className="hidden md:table-cell">Building</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="hidden lg:table-cell">Coordinates</TableHead>
+                <TableHead className="text-center">QR tag</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rooms.map((item, i) => (
+                <motion.tr
+                  key={item._id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.03 }}
+                  className="border-b border-border/60 transition-colors hover:bg-secondary/30"
+                >
+                  <TableCell className="font-semibold text-foreground">
+                    Room {item.roomNumber}
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                    {item.buildingId?.name}{' '}
+                    <span className="font-mono-data text-xs">({item.buildingId?.code})</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{item.roomType}</Badge>
+                  </TableCell>
+                  <TableCell className="hidden font-mono-data text-xs text-muted-foreground lg:table-cell">
+                    {item.latitude?.toFixed(6)}, {item.longitude?.toFixed(6)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary"
+                      onClick={() => showQr(item)}
+                    >
+                      <QrCode className="h-3.5 w-3.5" /> View
+                    </Button>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(item)}>
+                        <Pencil className="h-4 w-4 text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(item._id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </motion.tr>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 
-      {/* CRUD Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass w-full max-w-md rounded-xl p-6 space-y-4 border-slate-800 animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between border-b border-slate-800/40 pb-2.5">
-              <h3 className="text-lg font-bold text-white font-outfit">
-                {editingRoom ? 'Edit Room details' : 'Register New Room'}
-              </h3>
-              <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-white font-bold text-lg">
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300">Parent Building</label>
-                <select
-                  required
-                  value={formData.buildingId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, buildingId: e.target.value }))}
-                  className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none"
-                >
-                  {buildings.map(b => (
-                    <option key={b._id} value={b._id}>{b.name} ({b.code})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300">Room Number / ID</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.roomNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, roomNumber: e.target.value }))}
-                    placeholder="e.g. 101"
-                    className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300">Room Type</label>
-                  <select
-                    value={formData.roomType}
-                    onChange={(e) => setFormData(prev => ({ ...prev, roomType: e.target.value }))}
-                    className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-white focus:outline-none"
-                  >
-                    <option value="Classroom">Classroom</option>
-                    <option value="Laboratory">Laboratory</option>
-                    <option value="Hostel">Hostel</option>
-                    <option value="Library">Library</option>
-                    <option value="Office">Office</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300">Latitude Coordinate</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    required
-                    value={formData.latitude}
-                    onChange={(e) => setFormData(prev => ({ ...prev, latitude: e.target.value }))}
-                    placeholder="e.g. 11.0168"
-                    className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300">Longitude Coordinate</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    required
-                    value={formData.longitude}
-                    onChange={(e) => setFormData(prev => ({ ...prev, longitude: e.target.value }))}
-                    placeholder="e.g. 76.9558"
-                    className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/40">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 border border-slate-800 rounded-lg text-xs text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-semibold text-white shadow-lg"
-                >
-                  Save Room
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* QR Code Viewer Modal */}
-      {qrModalOpen && activeQr && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass w-full max-w-sm rounded-xl p-6 text-center space-y-4 border-slate-800 animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between border-b border-slate-800/40 pb-2">
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider font-outfit">Room QR Signboard</h4>
-              <button onClick={() => setQrModalOpen(false)} className="text-slate-400 hover:text-white font-bold text-lg">
-                ×
-              </button>
-            </div>
-            
-            <div className="p-3 bg-white rounded-xl inline-block shadow-md">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(activeQr.code)}`}
-                alt="QR Code"
-                className="w-48 h-48"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <h5 className="font-bold text-white font-outfit text-lg">Room {activeQr.roomNumber}</h5>
-              <p className="text-xs text-slate-400">{activeQr.buildingName}</p>
-            </div>
-
-            <div className="bg-slate-900 rounded-lg p-2.5 text-left border border-slate-800/60">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">QR Data Payload:</span>
-              <code className="text-xs text-indigo-400 font-mono break-all">{activeQr.code}</code>
-            </div>
-
-            <button
-              onClick={() => window.print()}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold rounded-lg text-white"
+      <AppModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={editingRoom ? 'Edit room details' : 'Register new room'}
+        description="Coordinates are used to verify auditor presence on-site."
+        icon={DoorOpen}
+        footer={
+          <>
+            <Button variant="outline" type="button" onClick={() => setModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="room-form">
+              Save room
+            </Button>
+          </>
+        }
+      >
+        <form id="room-form" onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Parent building" required>
+            <Select
+              value={formData.buildingId}
+              onValueChange={(v) => setFormData((p) => ({ ...p, buildingId: v }))}
             >
-              Print Room Signboard
-            </button>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a building" />
+              </SelectTrigger>
+              <SelectContent>
+                {buildings.map((b) => (
+                  <SelectItem key={b._id} value={b._id}>
+                    {b.name} ({b.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Room number / ID" required>
+              <Input
+                required
+                value={formData.roomNumber}
+                onChange={(e) => setFormData((p) => ({ ...p, roomNumber: e.target.value }))}
+                placeholder="e.g. 101"
+              />
+            </Field>
+            <Field label="Room type">
+              <Select
+                value={formData.roomType}
+                onValueChange={(v) => setFormData((p) => ({ ...p, roomType: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROOM_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Latitude" required>
+              <Input
+                type="number"
+                step="0.000001"
+                required
+                className="font-mono-data"
+                value={formData.latitude}
+                onChange={(e) => setFormData((p) => ({ ...p, latitude: e.target.value }))}
+                placeholder="11.0168"
+              />
+            </Field>
+            <Field label="Longitude" required>
+              <Input
+                type="number"
+                step="0.000001"
+                required
+                className="font-mono-data"
+                value={formData.longitude}
+                onChange={(e) => setFormData((p) => ({ ...p, longitude: e.target.value }))}
+                placeholder="76.9558"
+              />
+            </Field>
+          </div>
+        </form>
+      </AppModal>
+
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogHeader className="print:hidden">
+            <DialogTitle className="flex items-center justify-center gap-2 text-base">
+              <QrCode className="h-4 w-4 text-primary" /> Room QR signboard
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Printable QR tag for the selected room.
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeQr && (
+            <div className="space-y-4">
+              <div className="print-signboard overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-lg">
+                <div className="flex items-center justify-between gap-3 bg-slate-900 px-5 py-3 text-white">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/20">
+                      <ShieldCheck className="h-4 w-4" />
+                    </span>
+                    <div className="text-left leading-tight">
+                      <p className="font-display text-sm font-bold">Audit Console</p>
+                      <p className="font-mono-data text-[0.55rem] uppercase tracking-[0.22em] text-white/60">
+                        Inspection tag
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-white/10 px-2.5 py-1 font-mono-data text-[0.55rem] uppercase tracking-[0.18em] text-white/80">
+                    Scan
+                  </span>
+                </div>
+
+                <div className="px-6 py-6">
+                  <div className="mx-auto w-fit rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(
+                        activeQr.code
+                      )}`}
+                      alt="Room QR code"
+                      className="h-44 w-44"
+                    />
+                  </div>
+
+                  <div className="mt-5">
+                    <p className="font-mono-data text-[0.55rem] uppercase tracking-[0.26em] text-slate-400">
+                      Room
+                    </p>
+                    <h4 className="font-display text-3xl font-black leading-tight tracking-tight text-slate-900">
+                      {activeQr.roomNumber}
+                    </h4>
+                    <p className="mt-1 flex items-center justify-center gap-1.5 text-sm font-medium text-slate-500">
+                      <MapPin className="h-3.5 w-3.5" /> {activeQr.buildingName}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 border-t border-dashed border-slate-300 pt-3">
+                    <p className="font-mono-data text-[0.6rem] uppercase tracking-[0.2em] text-slate-400">
+                      Scan with the Audit Console app to begin inspection
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-secondary/40 p-3 text-left print:hidden">
+                <span className="block font-mono-data text-[0.6rem] font-bold uppercase tracking-wider text-muted-foreground">
+                  QR payload
+                </span>
+                <code className="break-all font-mono-data text-xs text-primary">
+                  {activeQr.code}
+                </code>
+              </div>
+
+              <Button className="w-full print:hidden" onClick={() => window.print()}>
+                <Printer className="h-4 w-4" /> Print signboard
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
