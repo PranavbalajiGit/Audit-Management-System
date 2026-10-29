@@ -17,6 +17,95 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+const ORIENTATIONS_BY_CATEGORY = {
+  'Guest House': [
+    { value: 'Room Entrance & Door Sign', label: 'Room Entrance & Door Sign' },
+    { value: 'Wide Angle Guest Room', label: 'Wide Angle Guest Room View' },
+    { value: 'Bed & Linens Quality', label: 'Bed & Linens Quality View' },
+    { value: 'Attached Bathroom & Sanitation', label: 'Attached Bathroom & Sanitation' },
+    { value: 'AC & Room Amenities', label: 'AC, TV & Electrical Amenities' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'COE Office': [
+    { value: 'Office Entrance & Security Door', label: 'Office Entrance & Security Door' },
+    { value: 'Wide Angle Office Layout', label: 'Wide Angle Office Layout' },
+    { value: 'Confidential Record Almirah', label: 'Confidential Record Almirah / Safe' },
+    { value: 'CCTV Camera Surveillance', label: 'CCTV Camera & Coverage View' },
+    { value: 'Exam Server & Workstation', label: 'Admin Workstation & Server Desk' },
+    { value: 'Paper Shredder & Hardware', label: 'Paper Shredder & Document Hardware' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Research and Development Centre': [
+    { value: 'R&D Centre Entrance & Sign', label: 'R&D Centre Entrance & Safety Sign' },
+    { value: 'Wide Angle Lab & Facility', label: 'Wide Angle Lab & Facility View' },
+    { value: 'Precision Test Bench', label: 'Precision Test Bench (Oscilloscope/Tools)' },
+    { value: 'Prototyping & 3D Printing Bay', label: 'Prototyping Bay / 3D Printer View' },
+    { value: 'Emergency Shutoff & PPE Rack', label: 'Emergency Power Shutoff & Safety Gear' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Medical Centre': [
+    { value: 'Clinic Entrance & Reception', label: 'Medical Centre Entrance & Desk' },
+    { value: 'Wide Angle Infirmary View', label: 'Wide Angle Clinic / Ward View' },
+    { value: 'Patient Examination Bed', label: 'Patient Bed & Sanitation Setup' },
+    { value: 'Locked Medicine Almirah', label: 'First Aid Kit & Locked Medicine Almirah' },
+    { value: 'Diagnostic & Oxygen Equipment', label: 'Vital Signs / Oxygen Equipment' },
+    { value: 'Bio-Medical Waste Bins', label: 'Color-Coded Bio-Waste Bins' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Radio Station': [
+    { value: 'Studio Entrance & ON AIR Sign', label: 'Studio Entrance & "ON AIR" Sign' },
+    { value: 'Wide Angle Studio View', label: 'Wide Angle Broadcast Studio View' },
+    { value: 'Audio Mixing Console', label: 'Broadcast Audio Mixing Console' },
+    { value: 'Microphones & Boom Mounts', label: 'Studio Microphones & Boom Mounts' },
+    { value: 'Acoustic Soundproofing Wall', label: 'Soundproofing Acoustic Wall Panels' },
+    { value: 'Transmission / Server Rack', label: 'Transmission & Monitoring Rack' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Classroom': [
+    { value: 'Room Entrance & Signboard', label: 'Room Entrance & Signboard' },
+    { value: 'Wide Angle Classroom View', label: 'Wide Angle Classroom View' },
+    { value: 'Whiteboard & Podium View', label: 'Whiteboard / Blackboard & Podium' },
+    { value: 'Student Benches & Desks', label: 'Student Benches & Desks' },
+    { value: 'Ceiling Projector & Electricals', label: 'Ceiling Projector & Electricals' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Laboratory': [
+    { value: 'Lab Entrance & Safety Signage', label: 'Lab Entrance & Safety Signage' },
+    { value: 'Wide Angle Workstation View', label: 'Wide Angle Workstation View' },
+    { value: 'Computer Terminals & Monitors', label: 'Computer Terminals & Monitors' },
+    { value: 'Networking & Server Rack', label: 'Networking Equipment / Server Rack' },
+    { value: 'Safety Extinguisher & First Aid', label: 'Fire Extinguisher & Safety Chart' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Hostel': [
+    { value: 'Room Entrance & Door Sign', label: 'Room Entrance & Door Sign' },
+    { value: 'Wide Angle Room View', label: 'Wide Angle Room View' },
+    { value: 'Beds & Mattresses Condition', label: 'Beds & Mattresses Condition' },
+    { value: 'Study Desks & Cupboards', label: 'Personal Desks & Cupboards' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Library': [
+    { value: 'Library Entrance & Turnstile', label: 'Library Entrance & Turnstile' },
+    { value: 'Wide Angle Book Stacks', label: 'Wide Angle Stacks & Book Racks' },
+    { value: 'Reading Tables & Seating', label: 'Reading Zone & Study Desks' },
+    { value: 'Circulation Desk & System', label: 'Circulation Desk & Cataloguing PC' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Office': [
+    { value: 'Office Entrance & Nameplate', label: 'Office Entrance & Nameplate' },
+    { value: 'Wide Angle Office Layout', label: 'Wide Angle Office Layout' },
+    { value: 'Desk & Workstation Setup', label: 'Executive / Staff Desk Setup' },
+    { value: 'Filing Cabinets & Storage', label: 'Filing Cabinets & Storage' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+  'Other': [
+    { value: 'Room Entrance View', label: 'Room Entrance (with Signboard)' },
+    { value: 'Wide Angle Room View', label: 'Wide Angle Room View' },
+    { value: 'Key Asset Highlight View', label: 'Key Asset Highlight View' },
+    { value: 'Other Perspective', label: 'Other Perspective' },
+  ],
+};
+
 const AuditSession = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,10 +126,23 @@ const AuditSession = () => {
   const [gpsError, setGpsError] = useState('');
 
   // Image Upload state
+  const currentRoomType = audit?.roomId?.roomType || 'Other';
+  const categoryOrientations = ORIENTATIONS_BY_CATEGORY[currentRoomType] || ORIENTATIONS_BY_CATEGORY['Other'];
+
   const [uploading, setUploading] = useState(false);
-  const [imageType, setImageType] = useState('Wide');
+  const [imageType, setImageType] = useState('Wide Angle Room View');
   const [uploadError, setUploadError] = useState('');
   const [testBypass, setTestBypass] = useState(false);
+
+  // Sync default imageType when room loads
+  useEffect(() => {
+    if (categoryOrientations && categoryOrientations.length > 0) {
+      const exists = categoryOrientations.some(opt => opt.value === imageType);
+      if (!exists) {
+        setImageType(categoryOrientations[0].value);
+      }
+    }
+  }, [currentRoomType]);
   
   // Live Camera state
   const videoRef = React.useRef(null);
@@ -606,16 +708,20 @@ const AuditSession = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300">Select Image Category</label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-300">Select Image Orientation</label>
+                  <span className="text-[10px] text-emerald-400 font-semibold">{currentRoomType}</span>
+                </div>
                 <select
                   value={imageType}
                   onChange={(e) => setImageType(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-white focus:outline-none"
+                  className="mt-1 block w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="Entrance">Room Entrance (with Signboard)</option>
-                  <option value="Wide">Wide Angle Room View</option>
-                  <option value="Asset">Asset Highlight View</option>
-                  <option value="Other">Other View</option>
+                  {categoryOrientations.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
