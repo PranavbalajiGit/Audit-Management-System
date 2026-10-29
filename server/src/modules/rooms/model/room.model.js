@@ -14,7 +14,19 @@ const roomSchema = new mongoose.Schema({
   roomType: {
     type: String,
     required: [true, 'Room type is required'],
-    enum: ['Classroom', 'Laboratory', 'Hostel', 'Library', 'Office', 'Other'],
+    enum: [
+      'Guest House',
+      'COE Office',
+      'Research and Development Centre',
+      'Medical Centre',
+      'Radio Station',
+      'Classroom',
+      'Laboratory',
+      'Hostel',
+      'Library',
+      'Office',
+      'Other',
+    ],
   },
   latitude: {
     type: Number,

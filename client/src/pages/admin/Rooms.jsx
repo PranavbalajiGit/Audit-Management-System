@@ -34,12 +34,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-const ROOM_TYPES = ['Classroom', 'Laboratory', 'Hostel', 'Library', 'Office', 'Other'];
+const ROOM_TYPES = [
+  'Guest House',
+  'COE Office',
+  'Research and Development Centre',
+  'Medical Centre',
+  'Radio Station',
+  'Classroom',
+  'Laboratory',
+  'Hostel',
+  'Library',
+  'Office',
+  'Other',
+];
 
 const emptyRoom = {
   buildingId: '',
   roomNumber: '',
-  roomType: 'Classroom',
+  roomType: 'Guest House',
   latitude: '11.0168',
   longitude: '76.9558',
   referenceImages: [],
