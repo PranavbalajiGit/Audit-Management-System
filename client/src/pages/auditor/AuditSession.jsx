@@ -883,36 +883,81 @@ const AuditSession = () => {
           ) : (
             <div className="space-y-5">
               {/* Premium VLM output card */}
-              <div className="rounded-xl border border-indigo-500/20 bg-indigo-600/5 p-4 space-y-2.5">
-                <div className="flex items-center justify-between border-b border-indigo-500/15 pb-2">
-                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">VLM Analysis Results</span>
-                  <span className="text-xs font-bold text-white">Match Confidence: {Math.round(audit.aiAnalysis.confidence * 100)}%</span>
-                </div>
-                <div className="text-xs space-y-1.5">
-                  <p className="text-slate-300"><strong className="text-white">Classification:</strong> {audit.aiAnalysis.roomClassification}</p>
-                  <p className="text-slate-300"><strong className="text-white">Scene Description:</strong> {audit.aiAnalysis.sceneDescription}</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <strong className="text-white mr-1 self-center">Assets:</strong>
-                    {audit.aiAnalysis.objects?.map((obj, i) => (
-                      <span key={i} className="px-1.5 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-500/10 text-[9px] font-semibold">{obj}</span>
-                    ))}
+              {(() => {
+                const matchPct = Math.round((audit.aiAnalysis.confidence || 0) * 100);
+                const isTypeMatch = String(audit.aiAnalysis.roomClassification || '').trim().toLowerCase() === String(room?.roomType || '').trim().toLowerCase();
+                
+                let badgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+                let badgeLabel = 'High Match';
+                if (matchPct < 50) {
+                  badgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+                  badgeLabel = 'Mismatch / Low Match';
+                } else if (matchPct < 75) {
+                  badgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+                  badgeLabel = 'Moderate Match';
+                }
+
+                return (
+                  <div className={`rounded-xl border p-4 space-y-2.5 transition-all ${
+                    matchPct >= 75
+                      ? 'border-indigo-500/20 bg-indigo-600/5'
+                      : matchPct >= 50
+                        ? 'border-amber-500/25 bg-amber-500/5'
+                        : 'border-rose-500/25 bg-rose-500/5'
+                  }`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-500/15 pb-2">
+                      <div>
+                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">VLM Analysis Results</span>
+                        <p className="text-[11px] text-slate-400">Target Space: <span className="text-slate-200 font-semibold">{room?.roomType}</span></p>
+                      </div>
+                      <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-bold ${badgeClass}`}>
+                        <span>{badgeLabel}:</span>
+                        <span>{matchPct}%</span>
+                      </div>
+                    </div>
+
+                    {!isTypeMatch && (
+                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-300 flex items-start gap-2">
+                        <span className="text-sm">⚠️</span>
+                        <div>
+                          <strong>Space Discrepancy:</strong> Image classified as <strong>"{audit.aiAnalysis.roomClassification}"</strong>, differing from target space <strong>"{room?.roomType}"</strong>. Confidence score is calibrated to reflect this mismatch.
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-xs space-y-1.5">
+                      <p className="text-slate-300">
+                        <strong className="text-white">Classification:</strong>{' '}
+                        <span className={isTypeMatch ? 'text-emerald-300 font-medium' : 'text-amber-300 font-medium'}>
+                          {audit.aiAnalysis.roomClassification}
+                        </span>
+                        {isTypeMatch ? ' ✓ (Matches Room)' : ' ✗ (Expected: ' + room?.roomType + ')'}
+                      </p>
+                      <p className="text-slate-300"><strong className="text-white">Scene Description:</strong> {audit.aiAnalysis.sceneDescription}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <strong className="text-white mr-1 self-center">Assets:</strong>
+                        {audit.aiAnalysis.objects?.map((obj, i) => (
+                          <span key={i} className="px-1.5 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-500/10 text-[9px] font-semibold">{obj}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-indigo-500/15 pt-2">
+                      <span className="text-[10px] text-slate-500">
+                        {aiMeta ? `via ${aiMeta.provider}${aiMeta.model ? ` · ${aiMeta.model}` : ''} — ` : ''}
+                        {audit.aiAnalysis.analyzedAt ? `Analyzed ${new Date(audit.aiAnalysis.analyzedAt).toLocaleString()}` : ''}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRunAI}
+                        disabled={aiRunning}
+                        className="text-[10px] font-semibold text-indigo-300 hover:text-indigo-200 disabled:opacity-50"
+                      >
+                        {aiRunning ? 'Re-analyzing...' : 'Re-run VLM Analysis'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between border-t border-indigo-500/15 pt-2">
-                  <span className="text-[10px] text-slate-500">
-                    {aiMeta ? `via ${aiMeta.provider}${aiMeta.model ? ` · ${aiMeta.model}` : ''} — ` : ''}
-                    {audit.aiAnalysis.analyzedAt ? `Analyzed ${new Date(audit.aiAnalysis.analyzedAt).toLocaleString()}` : ''}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleRunAI}
-                    disabled={aiRunning}
-                    className="text-[10px] font-semibold text-indigo-300 hover:text-indigo-200 disabled:opacity-50"
-                  >
-                    {aiRunning ? 'Re-analyzing...' : 'Re-run VLM Analysis'}
-                  </button>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Dynamic Q&A form */}
               <form onSubmit={handleFinalSubmit} className="space-y-4">
