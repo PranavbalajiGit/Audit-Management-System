@@ -47,8 +47,10 @@ api.interceptors.response.use(
         }
       }
       
-      // If we couldn't refresh, clear local storage and redirect to login
-      localStorage.clear();
+      // If we couldn't refresh, clear auth tokens and redirect to login
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
@@ -74,7 +76,9 @@ export const authService = {
     } catch (e) {
       // Ignore failure to inform backend
     }
-    localStorage.clear();
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
     window.location.href = '/login';
   },
   getProfile: async () => {
