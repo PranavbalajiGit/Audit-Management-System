@@ -54,6 +54,18 @@ export function ThemeProvider({ children, defaultTheme = 'light' }) {
     return () => mq.removeEventListener('change', onChange);
   }, [theme]);
 
+  // Sync theme changes across tabs or windows
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onStorage = (e) => {
+      if (e.key === STORAGE_KEY && (e.newValue === 'light' || e.newValue === 'dark' || e.newValue === 'system')) {
+        setThemeState(e.newValue);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const setTheme = useCallback((next) => {
     try {
       localStorage.setItem(STORAGE_KEY, next);

@@ -46,7 +46,7 @@ const auditImageSchema = new mongoose.Schema({
   capturedAt: { type: Date, default: Date.now },
   imageType: {
     type: String,
-    enum: ['Entrance', 'Wide', 'Asset', 'Other'],
+    trim: true,
     default: 'Other'
   }
 }, { _id: false });

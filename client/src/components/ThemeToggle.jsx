@@ -21,17 +21,36 @@ export function ThemeToggle({ variant = 'dropdown', className }) {
 
   if (variant === 'icon') {
     return (
-      <button
-        type="button"
-        onClick={toggleTheme}
-        aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
-        className={cn(
-          'flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
-          className
-        )}
-      >
-        <ActiveIcon className="h-4 w-4" />
-      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Toggle theme"
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+              className
+            )}
+          >
+            <ActiveIcon className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-36">
+          {OPTIONS.map(({ value, label, icon: Icon }) => (
+            <DropdownMenuItem
+              key={value}
+              onSelect={() => setTheme(value)}
+              className={cn(
+                'flex items-center gap-2 cursor-pointer',
+                theme === value && 'text-primary focus:text-primary font-medium'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+              {theme === value && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 

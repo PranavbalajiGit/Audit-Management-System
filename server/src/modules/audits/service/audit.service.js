@@ -87,9 +87,9 @@ class AuditService {
     }
 
     // Check if room category aligns with checklist category
-    if (room.roomType !== checklist.categoryId.name) {
+    if (String(room.roomType || '').trim().toLowerCase() !== String(checklist.categoryId?.name || '').trim().toLowerCase()) {
       // Allow it but log/warn, or enforce it
-      console.warn(`[Assignment Warning] Room type (${room.roomType}) differs from Checklist category (${checklist.categoryId.name})`);
+      console.warn(`[Assignment Warning] Room type (${room.roomType}) differs from Checklist category (${checklist.categoryId?.name})`);
     }
 
     return await auditRepository.createAssignment(assignmentData);
